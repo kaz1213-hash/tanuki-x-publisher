@@ -1,0 +1,1 @@
+Wake free publisher after X OAuth 1.0a write permission and access-token rotation.
