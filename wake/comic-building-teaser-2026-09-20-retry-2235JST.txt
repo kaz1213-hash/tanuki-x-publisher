@@ -1,0 +1,3 @@
+Wake request for due Tanuki Comic building teaser.
+Reason: queue item comic-building-teaser-2026-09-20 is READY, publish_at has passed, and no durable receipt exists yet.
+Expected behavior: publisher may post at most one eligible text item and persist public receipt.
