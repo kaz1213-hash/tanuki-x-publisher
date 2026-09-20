@@ -1,3 +1,5 @@
 queue_id=comic-building-teaser-2026-09-20
 intent=publish_due_low_risk_text
 source_commit=cbda2e583bce7a1c7aa61304918f2084a61515e0
+retry=1
+reason=prior wake produced no durable publication receipt
