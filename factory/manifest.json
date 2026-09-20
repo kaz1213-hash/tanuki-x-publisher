@@ -1,6 +1,15 @@
 {
   "schema": "tanuki-windows-factory-feed-v1",
   "feed_version": 1,
-  "updated_utc": "2026-09-21T05:14:00+09:00",
-  "jobs": []
+  "updated_utc": "2026-09-20T23:59:25.220Z",
+  "jobs": [
+    {
+      "job_id": "clinic-cockpit-rc3-r2-20260921-001",
+      "target_factory_id": "ed813f7bf5ebbd7fabb4819b769ac2182116d41a7c172992dae03d4e4c4cf10f",
+      "product": "Clinic Cockpit Lite v0.8.0 RC3",
+      "descriptor_url": "https://raw.githubusercontent.com/kaz1213-hash/tanuki-x-publisher/factory-feed/factory/jobs/clinic-cockpit-rc3-r2-20260921-001/descriptor.json",
+      "target_r2_head": "203a2a3775dc06671de4733ec01cb9d4f503ce87",
+      "enabled": true
+    }
+  ]
 }
