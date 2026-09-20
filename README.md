@@ -3,7 +3,9 @@
 Free public GitHub Actions transport for the SCA-owned Tanuki X account.
 
 - Drafts and future queue content remain private in `kaz1213-hash/tanuki-growth`.
-- This public repository wakes every 30 minutes and reads only the private Tanuki X queue through a fine-grained read-only token.
+- Publishing is deliberate and wake-triggered only: `workflow_dispatch` or a push under `wake/**`.
+- Scheduled polling is intentionally disabled so idle checks do not consume GitHub Actions.
+- It reads the private `tanuki-growth/tanuki-x/queue` via a fine-grained read-only token.
 - Only entries with `status: "ready"` and due `publish_at` are eligible.
 - At most one text post is published per run.
 - Only receipts for already-public X posts are stored here.
