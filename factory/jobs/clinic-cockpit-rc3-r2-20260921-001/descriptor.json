@@ -1,0 +1,14 @@
+{
+  "schema": "tanuki-windows-factory-encrypted-job-v1",
+  "job_id": "clinic-cockpit-rc3-r2-20260921-001",
+  "target_factory_id": "ed813f7bf5ebbd7fabb4819b769ac2182116d41a7c172992dae03d4e4c4cf10f",
+  "payload_url": "https://raw.githubusercontent.com/kaz1213-hash/tanuki-x-publisher/factory-feed/factory/jobs/clinic-cockpit-rc3-r2-20260921-001/payload.bin",
+  "cipher_sha256": "5066f4b6ebcd3f80031438b1d096f87120c9a4cbdd913c95b7295bde89bfe3f1",
+  "plain_sha256": "433b720dcf485cd90202ed1269e900fe5272ba555be8d51ce6f0cbec4b3cf764",
+  "encrypted_key_b64": "U4CigqsRzVRQLVhiP+XPrtYdpldVNbXmWV+nQZNLD7hodMQFPusURVVrqYTpBD8w9v4hq/9pqtdOy8aDSlz4Oz0hl8AbutNskBcNVEqGXQK+i6L5/7mC7eYVQ9P5ABth/d0obPbKWe5ePECUO1CRuuuiyNSIJTapHRF4MifChpH9bEuZzqVfjSt2SpuriKcow9UotTZKZYJI0yHTl6A2OCI/Ooknzb9IzM84CHij7Il8owy4OtdlfE+zaOIBFiH2hmWXXKw8IV7qMvGoEr2tTdyQFQDGb9jRIH6BouwmT8WA8KR0805sfjYEvZaXg+AK+5v+3xGX+UGI9UYukeNC9JI3EIPwFB8d7KeR1EutU9Dj/PtjgijjQ0V08z0pHHgWOpG2Z87jHpp2SXBmVIo3kn2zYpETONDjaCldkUSOxMyErD76nV/69mGgAbst/cFhj5cBTXqUtz5VpWeX/QjKjL8i3BWfcuhGXngP71bGm6A2yP1+8Md1gYwQnFUK2gQw",
+  "iv_b64": "FOG/Zf8j+mSOmDGvppik+g==",
+  "hmac_b64": "YhAnfcrjUh4dFwentwTigam/hxeWOFUaqz8Sq28+Eno=",
+  "created_utc": "2026-09-20T23:58:17.332240+00:00",
+  "product": "Clinic Cockpit Lite v0.8.0 RC3",
+  "target_r2_head": "203a2a3775dc06671de4733ec01cb9d4f503ce87"
+}
