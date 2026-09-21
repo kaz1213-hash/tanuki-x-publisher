@@ -1,6 +1,6 @@
 {
   "schema": "tanuki-windows-factory-controller-queue-v1",
-  "updated_utc": "2026-09-21T03:29:37Z",
+  "updated_utc": "2026-09-21T04:29:54.958Z",
   "execution_policy": "ONE_AT_A_TIME",
   "active_job_id": "clinic-cockpit-rc3-r2-20260921-001",
   "jobs": [
@@ -8,7 +8,7 @@
       "position": 1,
       "job_id": "clinic-cockpit-rc3-r2-20260921-001",
       "product": "Clinic Cockpit Lite v0.8.0 RC3",
-      "state": "ACTIVE_PAYLOAD_PICKUP_CONFIRMED_RUNTIME_PENDING",
+      "state": "HOLD_EXECUTION_AND_LOCAL_RESULT_UNOBSERVED",
       "target_factory_id": "ed813f7bf5ebbd7fabb4819b769ac2182116d41a7c172992dae03d4e4c4cf10f",
       "canonical_issue": "kaz1213-hash/clinic-cockpit-lite#49",
       "target_head": "203a2a3775dc06671de4733ec01cb9d4f503ce87"
@@ -29,7 +29,7 @@
       "source_exe_sha256": "67ca1fdb3e097ace77e4ea61352ddef49ed42ef0b052aa85dfb952b248684164",
       "gate": "ordinary Windows + headed ordinary Google Chrome full v0.8 buyer flow",
       "dispatch_ready": false,
-      "dispatch_blocker": "Do not run concurrently. Promote only after Cockpit returns PASS or a bounded concrete FAIL."
+      "dispatch_blocker": "Factory Completion Gate and Cockpit runtime result must be proven; a generic terminal FAIL does not authorize automatic advancement."
     },
     {
       "position": 3,
@@ -39,5 +39,5 @@
       "blocked_by": "tanuki-comic-gate-a-v08-20260921-queued"
     }
   ],
-  "project_wide_gate": "WINDOWS_FACTORY_RUNTIME_EXECUTION_IN_PROGRESS"
+  "project_wide_gate": "HOLD_FACTORY_NOT_COMPLETE"
 }

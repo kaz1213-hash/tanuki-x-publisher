@@ -1,42 +1,11 @@
-# Tanuki Windows Factory — Status
+# Spectre Factory — HOLD
 
-> Controller view. This page is intentionally fail-closed: it does **not** claim Spectre is live unless a machine heartbeat exists.
+Last machine evidence: 2026-09-21 12:29:37 JST real payload request. This is not a current heartbeat.
 
-## Factory
+Runtime and local OUTBOX result: unobserved. Automatic result return: not connected. GitHub silence does not establish a Windows hang.
 
-- Factory: `spectre-win11`
-- Install: ✅ PASS
-- Self-test: ✅ PASS
-- Auto-start: ✅ at Windows logon
-- GitHub Actions: not used
-- Live machine heartbeat: ⚪ **NOT CONNECTED YET**
-- Outbound result return: ⚪ **NOT CONNECTED YET**
+Source defect reproduced: HMACSHA256 construction expands a 32-byte array into 32 arguments. Repair and 24 synthetic PowerShell assertions are staged in [PR #2](https://github.com/kaz1213-hash/tanuki-x-publisher/pull/2). Not installed; Windows 5.1 and Spectre runtime not verified.
 
-## Queue
+Queue: Cockpit HOLD -> Comic BLOCKED -> FX BLOCKED. Factory completion and USER_TESTABLE_ARTIFACT_READY remain false.
 
-| Order | Product | State |
-|---|---|---|
-| 1 | Clinic Cockpit Lite v0.8.0 RC3 | 🟡 ACTIVE — dispatched, awaiting local OUTBOX result |
-| 2 | Tanuki Comic Gate A / known-good v0.8 | 🕒 QUEUED — starts only after Cockpit is resolved |
-| 3 | FX University Windows/native gate | 🕒 QUEUED — after Comic |
-
-## Tanuki Comic queued artifact
-
-- Canonical issue: `kaz1213-hash/tanuki-comic#31`
-- Recovery head: `1d928cb9e1c73e160a7e5ccfb53856e1c8b03b8a`
-- Known-good baseline: `cd170861f8318af9795db4f8dd5f52472d0acc91`
-- Source ZIP SHA-256: `3f32c97f523fa41c58175a9fada0cc9a1c3fd92f837677081aaf51bde79f781b`
-- Historical EXE SHA-256: `67ca1fdb3e097ace77e4ea61352ddef49ed42ef0b052aa85dfb952b248684164`
-- Gate: ordinary Windows + headed ordinary Google Chrome full v0.8 buyer flow
-
-## v1.1 visibility requirement
-
-Spectre itself should visibly show:
-- watcher alive/dead;
-- last poll time;
-- current job;
-- current phase;
-- last PASS/FAIL;
-- next queued job.
-
-Preferred UX: a tiny always-available local status window or tray indicator. No PowerShell/log inspection for the Director.
+Director action: NONE. No repeat repair ZIP request. Remaining work: actual machine evidence/return channel, native Windows validation, Cockpit final artifact gate, visible liveness/notification, durable queue transport/progression, reboot regression.

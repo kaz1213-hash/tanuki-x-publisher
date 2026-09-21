@@ -1,6 +1,6 @@
 {
   "schema": "tanuki-windows-factory-controller-status-v1",
-  "updated_utc": "2026-09-21T03:29:37Z",
+  "updated_utc": "2026-09-21T04:29:54.958Z",
   "factory": {
     "name": "spectre-win11",
     "id": "ed813f7bf5ebbd7fabb4819b769ac2182116d41a7c172992dae03d4e4c4cf10f",
@@ -11,17 +11,19 @@
     "github_auth_required": false
   },
   "controller_view": {
-    "machine_live_heartbeat_available": true,
-    "live_machine_state": "WATCHER_ACTIVE_PAYLOAD_PICKUP_CONFIRMED",
+    "machine_live_heartbeat_available": false,
+    "live_machine_state": "UNKNOWN_AFTER_LAST_RETURNED_PICKUP",
     "last_confirmed_machine_evidence": "v1.0.8 REPAIRED_PICKUP_CONFIRMED",
     "active_job": "clinic-cockpit-rc3-r2-20260921-001",
-    "active_job_state": "PAYLOAD_REQUESTED_RUNTIME_RESULT_PENDING",
+    "active_job_state": "PAYLOAD_REQUEST_CONFIRMED_EXECUTION_AND_LOCAL_RESULT_UNOBSERVED",
     "next_job": "tanuki-comic-gate-a-v08-20260921-queued",
     "queue_depth": 3,
     "outbound_result_return_connected": false,
-    "note": "Real watcher pickup confirmed from fresh armed supervisor counters.",
-    "likely_root_cause": "RESOLVED_IN_V1.0.8: the prior remote-feed/job-pickup failure is no longer active; real Cockpit payload pickup is confirmed.",
-    "next_physical_action": "NONE. Director intervention is not required. Await the Cockpit runtime result in Factory OUTBOX/result return path."
+    "note": "A returned one-time pickup report is not a live heartbeat. Outbound result transport is not connected; no GitHub result does not prove a Windows hang.",
+    "likely_root_cause": "HMACSHA256 New-Object byte-array constructor failure reproduced on PowerShell 7.4.19 Linux. Spectre failure phase remains unconfirmed.",
+    "next_physical_action": "NONE: staged repair is not Windows-qualified; result return and actual machine evidence remain missing. Do not request another Director debug run.",
+    "repair_pr": "https://github.com/kaz1213-hash/tanuki-x-publisher/pull/2",
+    "repair_installed": false
   },
   "desired_v11_visibility": {
     "state": "PARTIAL",
