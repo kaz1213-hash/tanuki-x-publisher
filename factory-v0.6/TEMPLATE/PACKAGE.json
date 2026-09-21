@@ -1,0 +1,13 @@
+{
+  "schema": "tanuki-windows-job-package-v1",
+  "package_id": "tanuki-product-canary-v1",
+  "product": "Tanuki Product",
+  "package_version": "1.0",
+  "risk_class": "read-only",
+  "director_operations_required": 0,
+  "job_directory": "JOB",
+  "source": {
+    "repository": "owner/repository",
+    "ref": "reviewed-ref"
+  }
+}
