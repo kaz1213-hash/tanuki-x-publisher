@@ -1,0 +1,29 @@
+{
+  "schema": "tanuki-windows-factory-controller-status-v1",
+  "updated_utc": "2026-09-21T00:59:09Z",
+  "factory": {
+    "name": "spectre-win11",
+    "id": "ed813f7bf5ebbd7fabb4819b769ac2182116d41a7c172992dae03d4e4c4cf10f",
+    "installed": true,
+    "selftest_pass": true,
+    "auto_start": "AT_LOGON",
+    "github_actions_used": false,
+    "github_auth_required": false
+  },
+  "controller_view": {
+    "machine_live_heartbeat_available": false,
+    "live_machine_state": "UNKNOWN_FROM_REMOTE",
+    "last_confirmed_machine_evidence": "INSTALL/SELFTEST/PAIRING PASS on 2026-09-20/21",
+    "active_job": "clinic-cockpit-rc3-r2-20260921-001",
+    "active_job_state": "DISPATCHED_AWAITING_LOCAL_OUTBOX_RESULT",
+    "next_job": "tanuki-comic-gate-a-v08-20260921-queued",
+    "queue_depth": 3,
+    "outbound_result_return_connected": false,
+    "note": "This file is controller-side visibility only. It must not be interpreted as a live Spectre heartbeat."
+  },
+  "desired_v11_visibility": {
+    "state": "PLANNED",
+    "requirement": "Spectre itself should expose a persistent visible status showing watcher alive, last poll, active job, last result, and next queued job.",
+    "preferred_surface": "small always-available local status window or tray indicator; no Director debugging steps"
+  }
+}
