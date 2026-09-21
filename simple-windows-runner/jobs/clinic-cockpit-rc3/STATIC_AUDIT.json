@@ -1,0 +1,87 @@
+{
+  "schema": "tanuki-cockpit-factory-canary-static-audit-v2",
+  "status": "PASS",
+  "runner": {
+    "version": "0.5",
+    "main_merge_commit": "69bbcc1df26c08ae9533bfdb9cc8b2f1e73642d7",
+    "runjob_blob": "574f1999a5c0ca705c29baf4a50ac859ccd58ab9",
+    "spectre_runtime_qualified": true,
+    "modified_by_canary": false
+  },
+  "cockpit": {
+    "candidate": "v0.8.0 RC3",
+    "corrected_frozen_commit": "bf640bc9a58c3810b2d8cadde46b142054a18f3f",
+    "corrected_frozen_tree": "4dcd25855460d7b15ce14261e9eae79aceab54f8",
+    "release_ready_branch": "release-ready/v0.8.0-rc3-no-github-r2",
+    "release_ready_head": "7bd55eb7010fe20f233506cea0ac11a6a48c9449",
+    "product_runtime_source_changed_by_latest_fix": false
+  },
+  "canonical_source_acquisition": {
+    "mode": "pinned-public-github-archive",
+    "repository": "kaz1213-hash/clinic-cockpit-lite",
+    "commit": "7bd55eb7010fe20f233506cea0ac11a6a48c9449",
+    "requires_existing_spectre_package": false,
+    "requires_git": false,
+    "requires_github_login": false,
+    "requires_pat": false,
+    "embedded_patch_payload": false,
+    "archive_bytes_trusted_without_content_checks": false,
+    "archive_content_identity_checked_before_execution": true,
+    "full_frozen_source_verification_owned_by_hardened_builder": true
+  },
+  "exact_blob_contract": {
+    "corrected_release_manifest": "4caeec00f80e3315f1e3421a90b3b2b1d2add9c7",
+    "corrected_launcher_test": "ee78ac488b7d402f870e7f48efe457169c12fb0f",
+    "corrected_rc3_adapter": "7fc0b9e9252adef250654db645c20db86f323aad",
+    "corrected_rc3_bootstrap": "50dd8176ab2183c0f5daa82971964ef0a3ac86f1",
+    "hardened_base_builder": "866bf993f83a6add72f2593b579ba7f408eb8536",
+    "frozen_start_here": "5be7c5c73d20122bdd3226d2f65d2275c066a1bd",
+    "release_ready_manifest_blob_verified_from_canonical_repo": true,
+    "release_ready_launcher_test_blob_verified_from_canonical_repo": true,
+    "release_ready_adapter_blob_verified_from_canonical_repo": true,
+    "release_ready_bootstrap_blob_verified_from_canonical_repo": true
+  },
+  "job_contract": {
+    "schema": "tanuki-windows-runner-job-v1",
+    "console_tail": false,
+    "safe_results": [
+      "COCKPIT_JOB_RESULT.json",
+      "BUILD_RESULT_SUMMARY.json"
+    ],
+    "required_results": [
+      "COCKPIT_JOB_RESULT.json"
+    ],
+    "short_temp_staging": true,
+    "fail_closed_unknown_canonical_blob": true,
+    "final_artifact_separate_from_result_zip": true,
+    "final_zip_sha_reverified_before_delivery": true,
+    "exact_final_zip_auto_extracted_for_visual_touch": true,
+    "exact_final_exe_auto_launched": true,
+    "release_pass_remains_false_until_visual_touch": true
+  },
+  "acceptance_required_pass_steps": [
+    "frozen-source-verification",
+    "integrated-source-completion-gate",
+    "windows-runtime-product-gate",
+    "portable-renamed-exe-runtime-gate",
+    "final-zip-extracted-runtime-gate",
+    "portable-privacy-scan"
+  ],
+  "privacy": {
+    "patient_data_collected": false,
+    "raw_orca_collected": false,
+    "raw_uke_collected": false,
+    "console_tail_returned": false,
+    "diagnostic_result_allowlisted": true
+  },
+  "architecture": {
+    "encrypted_feed": false,
+    "hmac_transport": false,
+    "dpapi_transport": false,
+    "queue": false,
+    "scheduled_watcher": false,
+    "github_self_hosted_runner": false
+  },
+  "runtime_claim": "PENDING_FRESH_SPECTRE_PRODUCT_CANARY",
+  "merge_rule": "Do not merge product canary PR before fresh Spectre evidence."
+}
