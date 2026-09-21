@@ -1,0 +1,13 @@
+{
+  "schema": "tanuki-windows-runner-job-v1",
+  "job_id": "tanuki-product-canary-v1",
+  "entrypoint": "run.ps1",
+  "timeout_minutes": 30,
+  "include_console_tail": false,
+  "safe_result_files": [
+    "PRODUCT_RESULT.json"
+  ],
+  "required_result_files": [
+    "PRODUCT_RESULT.json"
+  ]
+}
