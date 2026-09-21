@@ -15,6 +15,7 @@ RunJob.ps1
 JOB/
   job.json
   RunClinicCockpit.ps1
+  CockpitAcceptance.ps1
 ```
 
 `START_COCKPIT_WINDOWS.cmd` is the only intended human entrypoint for the Cockpit canary.
@@ -34,7 +35,9 @@ There is no final keypress/pause requirement.
 }
 ```
 
-The child job writes deliverables under `%TANUKI_RUNNER_OUT%`.
+The child job writes only safe evidence under `%TANUKI_RUNNER_OUT%`.
+Validated product ZIPs are kept separately in `ARTIFACTS/<run-id>/` via
+`%TANUKI_RUNNER_ARTIFACTS%`; they are not included in the returned RESULT.zip.
 The runner creates:
 - `RESULT.json`
 - `RESULT.zip`
@@ -49,3 +52,6 @@ Windows runtime, renamed Japanese EXE, clean re-extract runtime, privacy, and fi
 
 No administrator rights are required by the generic runner. The generic runner itself makes no
 network request.
+
+
+Latest AI-side audit: see `RC3_HANDOFF_AUDIT.md`. No Windows runtime PASS is implied by the source or its synthetic tests.

@@ -1,4 +1,4 @@
-Set-StrictMode -Version 2.0
+﻿Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -90,6 +90,7 @@ try {
     New-Item -ItemType Directory -Path $jobOutput -Force | Out-Null
     $env:TANUKI_RUNNER_OUT = $jobOutput
     $env:TANUKI_RUNNER_JOB_ID = $receipt.job_id
+    $env:TANUKI_RUNNER_ARTIFACTS = Join-Path $Root ('ARTIFACTS\'+[Guid]::NewGuid().ToString('N'))
 
     $ext = [IO.Path]::GetExtension($entryCanonical).ToLowerInvariant()
     $exe = $null
@@ -105,6 +106,7 @@ try {
 
     $receipt.phase = 'RUN_JOB'
     $proc = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory $WorkRoot -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr -PassThru
+    $handle = $proc.Handle
     $completed = $proc.WaitForExit($timeoutMinutes * 60 * 1000)
     if(-not $completed) {
         try { & taskkill.exe /PID $proc.Id /T /F 2>$null | Out-Null } catch { try { $proc.Kill() } catch {} }
@@ -114,6 +116,7 @@ try {
         $receipt.exit_code = 124
     } else {
         $proc.WaitForExit()
+        if($null -eq $proc.ExitCode){throw 'CHILD_EXIT_CODE_UNAVAILABLE'}
         $receipt.exit_code = [int]$proc.ExitCode
         if($proc.ExitCode -eq 0) {
             $receipt.status = 'PASS'
@@ -171,3 +174,4 @@ finally {
 if($receipt.status -eq 'PASS'){ exit 0 }
 if($receipt.status -eq 'FAIL'){ exit 1 }
 exit 2
+

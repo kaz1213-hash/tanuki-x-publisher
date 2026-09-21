@@ -1,4 +1,4 @@
-Set-StrictMode -Version 2.0
+﻿Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
 $Out = $env:TANUKI_RUNNER_OUT
@@ -10,6 +10,8 @@ $ExpectedReadyBranch = 'release-ready/v0.8.0-rc3-no-github-r2'
 $ExpectedCandidate = 'v0.8.0 RC3'
 $ExpectedStartHereBlob = '5be7c5c73d20122bdd3226d2f65d2275c066a1bd'
 $Phase = 'INIT'
+$LASTEXITCODE = 0
+. (Join-Path $PSScriptRoot 'CockpitAcceptance.ps1')
 
 function Get-SafeProperty($Object,[string]$Name,$Default=$null){
     if($null -eq $Object){ return $Default }
@@ -155,55 +157,32 @@ try{
 
     $Phase='RUN_EXISTING_RC3_GATE'
     $Bootstrap=Join-Path $Stage 'tools\release_v080_rc3_bootstrap.ps1'
-    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $Bootstrap
-    $rc=$LASTEXITCODE
+    $arguments='-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$Bootstrap+'"'
+    $builder=Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -WorkingDirectory $Stage -RedirectStandardOutput (Join-Path $Stage 'builder.stdout.local.log') -RedirectStandardError (Join-Path $Stage 'builder.stderr.local.log') -PassThru
+    $builderHandle=$builder.Handle
+    $builder.WaitForExit()
+    $rc=$builder.ExitCode
+    if($null -eq $rc){throw 'BUILDER_EXIT_CODE_UNAVAILABLE'}
 
     $Phase='READ_BUILD_RESULT'
     $Release=Join-Path $Stage 'RELEASE_OUTPUT_V080_RC3'
     $Build=Join-Path $Release 'BUILD_RESULT.json'
     if(-not(Test-Path -LiteralPath $Build -PathType Leaf)){Write-JobResult 'FAIL' 'BUILD_RESULT_MISSING' @{builder_exit=$rc};exit 22}
 
-    Copy-Item -LiteralPath $Build -Destination (Join-Path $Out 'BUILD_RESULT.json') -Force
     $B=Get-Content -LiteralPath $Build -Raw -Encoding UTF8|ConvertFrom-Json
 
-    $required=@('frozen-source-verification','integrated-source-completion-gate','windows-runtime-product-gate','portable-renamed-exe-runtime-gate','final-zip-extracted-runtime-gate','portable-privacy-scan')
-    $missing=@()
-    $steps=@(Get-SafeProperty $B 'steps' @())
-    foreach($name in $required){
-      $step=@($steps|Where-Object{[string](Get-SafeProperty $_ 'name' '') -eq $name -and [string](Get-SafeProperty $_ 'status' '') -eq 'PASS'})|Select-Object -First 1
-      if(-not $step){$missing+=$name}
-    }
-
-    $buildStatus=[string](Get-SafeProperty $B 'status' '')
-    $windowsPass=[bool](Get-SafeProperty $B 'windows_candidate_pass' $false)
-    $frozen=[string](Get-SafeProperty $B 'frozen_commit' '')
-    $failedStep=Get-LastFailedStep $B
-    $zipCandidates=@(Get-ChildItem -LiteralPath $Release -Filter '*.zip' -File -ErrorAction SilentlyContinue)
-    $zip=$null
-    if($zipCandidates.Count -eq 1){$zip=$zipCandidates[0].FullName}
-    $ok=($rc -eq 0 -and $buildStatus -eq 'PASS' -and $windowsPass -and $frozen -eq $ExpectedFrozen -and $missing.Count -eq 0 -and $zip)
-    if(-not $ok){
-        Write-JobResult 'FAIL' 'WINDOWS_CANDIDATE_NOT_PASS' @{
-            builder_exit=$rc
-            build_status=$buildStatus
-            windows_candidate_pass=$windowsPass
-            failed_step=$failedStep
-            missing_required_gates=@($missing)
-            final_zip_count=$zipCandidates.Count
-        }
-        exit 23
-    }
-
+    Get-SafeBuildSummary $B|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $Out 'BUILD_RESULT_SUMMARY.json') -Encoding UTF8
     $Phase='VERIFY_FINAL_ZIP'
+    $zip=Test-CockpitAcceptance $B $Release $rc
     $zipName=[IO.Path]::GetFileName($zip)
     $sha=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-    $declaredSha=[string](Get-SafeProperty $B 'output_zip_sha256' '')
-    if($declaredSha -and $declaredSha.ToLowerInvariant() -ne $sha){Write-JobResult 'FAIL' 'FINAL_ZIP_SHA_MISMATCH' @{actual_sha256=$sha};exit 24}
-
     $Phase='COLLECT_FINAL_ARTIFACT'
-    Copy-Item -LiteralPath $zip -Destination (Join-Path $Out $zipName) -Force
-    $shaFile=Join-Path $Release 'SHA256.txt'
-    if(Test-Path -LiteralPath $shaFile -PathType Leaf){Copy-Item -LiteralPath $shaFile -Destination (Join-Path $Out 'SHA256.txt') -Force}
+    $artifactRoot=$env:TANUKI_RUNNER_ARTIFACTS
+    if(-not $artifactRoot){throw 'ARTIFACT_DIRECTORY_MISSING'}
+    New-Item -ItemType Directory -Path $artifactRoot -Force|Out-Null
+    $delivered=Join-Path $artifactRoot $zipName
+    Copy-Item -LiteralPath $zip -Destination $delivered -Force
+    if((Get-FileHash -LiteralPath $delivered -Algorithm SHA256).Hash.ToLowerInvariant() -ne $sha){throw 'DELIVERED_ZIP_SHA_MISMATCH'}
 
     $Phase='TERMINAL_PASS'
     Write-JobResult 'PASS' 'WINDOWS_CANDIDATE_PASS' @{
@@ -212,12 +191,12 @@ try{
         output_zip_sha256=$sha
         repaired_stale_start_here_in_stage=$true
         original_package_modified=$false
-        required_gates=@($required)
+        product_gate_verified=$true
     }
     exit 0
 }catch{
     $safeType=$_.Exception.GetType().Name
-    Write-JobResult 'FAIL' 'COCKPIT_JOB_EXCEPTION' @{exception_type=$safeType}
+    Write-JobResult 'FAIL' 'COCKPIT_JOB_EXCEPTION' @{exception_type=$safeType;exception_line=[int]$_.InvocationInfo.ScriptLineNumber}
     exit 30
 }finally{
     try{if($Stage -and (Test-Path -LiteralPath $Stage)){Remove-Item -LiteralPath $Stage -Recurse -Force -ErrorAction SilentlyContinue}}catch{}
