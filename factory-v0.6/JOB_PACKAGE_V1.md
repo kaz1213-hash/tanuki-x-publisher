@@ -73,6 +73,7 @@ Supported entrypoints: `.ps1`, `.cmd`, `.bat`, `.vbs`, `.exe`.
 2. AI/package builder runs `Test-JobPackage.ps1`.
 3. Only a PASS package is handed to Spectre.
 4. Handoff launcher runs the same preflight again, then invokes the unchanged v0.5 runner.
-5. Spectre returns `RESULT.zip`; product artifacts remain separate.
+5. `Verify-FactoryPackageResult.ps1` checks runner identity/status, required-result presence, allowlist compliance, and exact `RESULT.zip` contents.
+6. Spectre returns the bounded `RESULT.zip`; product artifacts remain separate.
 
 No encrypted feed, HMAC, DPAPI, queue, scheduled watcher, service, PAT, or GitHub Actions are part of this contract.
