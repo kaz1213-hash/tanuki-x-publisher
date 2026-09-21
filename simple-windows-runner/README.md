@@ -1,41 +1,68 @@
-# Tanuki Windows Runner v0.4
+# Tanuki Windows Runner v0.5
 
-Purpose: run one self-contained Windows job on Spectre and return one `RESULT.zip` plus a separately verified final product artifact when the candidate passes.
+Purpose: run one self-contained Windows job on Spectre, return one privacy-bounded \`RESULT.zip\`, and keep validated product artifacts separate under \`ARTIFACTS/<run-id>/\`.
 
-This intentionally does **not** implement a queue, remote feed, encrypted/HMAC/DPAPI transport, scheduled tasks, retries, reboot persistence, GitHub Actions, PAT/OAuth or a background service. The reset goal is one Windows execution lane end-to-end before infrastructure.
+This reset lane intentionally does **not** implement a queue, remote feed, encrypted/HMAC/DPAPI transport, scheduled task, retry/reboot persistence, GitHub Actions, PAT/OAuth, or a background service. First prove a small Windows execution contract end-to-end.
 
-## One-click Cockpit layout
+## Generic runner contract
 
-```text
-START_COCKPIT_WINDOWS.cmd
-RUN_JOB.cmd
-RunJob.ps1
-JOB/
-  job.json
-  RunClinicCockpit.ps1
-  CockpitAcceptance.ps1
-  RC3_PATCH/
-    RELEASE_CANDIDATE.json
-    tests/test_release_candidate_v080.py
-    tests/test_windows_launcher_runtime.py
-    tools/release_v080_rc3_builder.py
-    tools/release_v080_rc3_bootstrap.ps1
-```
+The canonical job manifest schema is \`tanuki-windows-runner-job-v1\`.
 
-`START_COCKPIT_WINDOWS.cmd` is the only intended human entrypoint.
+\`\`\`json
+{
+  "schema": "tanuki-windows-runner-job-v1",
+  "job_id": "example",
+  "entrypoint": "run.cmd",
+  "timeout_minutes": 60,
+  "include_console_tail": false,
+  "safe_result_files": ["SAFE_RESULT.json"],
+  "required_result_files": ["SAFE_RESULT.json"]
+}
+\`\`\`
 
-The Cockpit job can consume a local RC3 R2 package frozen at the original `70ec03be3de89548bf61ceea2661bffb03dab18a`, the prior corrected `33fffccf66ab66f4bf161af8f07797576a6379b7`, or the current `bf640bc9a58c3810b2d8cadde46b142054a18f3f`. It never edits that local package. Instead it copies the package to TEMP, overlays the bounded current RC3 test-contract/release-adapter patch, restores the exact frozen `START_HERE_WINDOWS.bat`, verifies the staged identity, and executes the existing hardened RC3 Windows release gate.
+Rules:
+- the job is copied to a short isolated TEMP path before execution;
+- reparse points inside the supplied job are rejected;
+- entrypoint paths and result paths must be safe relative paths;
+- child jobs receive:
+  - \`TANUKI_RUNNER_OUT\`
+  - \`TANUKI_RUNNER_JOB_ID\`
+  - \`TANUKI_RUNNER_RUN_ID\`
+  - \`TANUKI_RUNNER_ARTIFACTS\`
+- only files explicitly listed in \`safe_result_files\` can enter \`RESULT.zip\`;
+- a successful child process is still failed closed when a file listed in \`required_result_files\` is missing;
+- console tails are excluded unless the manifest explicitly opts in;
+- product artifacts are never bundled into the diagnostic ZIP by the generic runner.
 
-The latest bounded correction is test-only: the Windows launcher unit fixture now uses the already-isolated release TEMP root with a short leaf instead of pytest's deeply nested `tmp_path` as `LOCALAPPDATA`. This avoids a false failure from legacy Windows MAX_PATH while preserving the same ready-sentinel/state/privacy assertions. Product runtime source is unchanged.
+\`RESULT.json\` uses schema \`tanuki-windows-runner-result-v3\` and records the runner version, run id, manifest schema, child exit code, collected safe-result names, missing required-result names, and artifact count without exposing local filesystem paths.
 
-## Generic job contract
+## One-click runner self-test
 
-The child job writes only safe evidence under `%TANUKI_RUNNER_OUT%`. Validated product ZIPs are kept separately in `ARTIFACTS/<run-id>/` via `%TANUKI_RUNNER_ARTIFACTS%`; they are not included in the returned diagnostic ZIP. The runner creates `RESULT.json` and `RESULT.zip`.
+Run:
 
-Runner PASS requires the child process to exit 0 and result collection/compression to complete. A timeout attempts to terminate the child process tree. Console tails are excluded by default.
+\`START_RUNNER_SELFTEST.cmd\`
 
-Cockpit PASS additionally requires exact candidate/schema/current-frozen identity, strictly boolean Windows Candidate PASS, exactly one PASS for every required release gate, a valid final ZIP SHA-256, and successful copied-artifact SHA verification.
+The self-test is product-independent. It verifies the generic environment/output/artifact contract and intentionally writes one **unlisted** probe file into the child output directory. A correct runner must omit that probe from \`RESULT.zip\` while collecting the allowlisted \`SELFTEST_RESULT.json\`.
 
-No administrator rights are required by the generic runner. The generic runner itself makes no network request. Product source/UI is not redesigned by this package.
+This is the preferred Factory canary now that Clinic Cockpit RC3 has been completed through another product-specific route.
 
-Latest AI-side audit: see `RC3_HANDOFF_AUDIT.md`. No Windows Candidate PASS is implied until the actual Spectre run returns the required evidence.
+## Clinic Cockpit canary
+
+\`START_COCKPIT_WINDOWS.cmd\` and \`JOB/\` remain as a historical/product canary. They are no longer the definition of the generic Factory architecture.
+
+The Cockpit job still consumes its bounded RC3 package, stages to TEMP, applies its product-specific acceptance/repair logic, and returns only:
+- \`BUILD_RESULT_SUMMARY.json\`
+- \`COCKPIT_JOB_RESULT.json\`
+
+The generic runner does not interpret Clinic Cockpit release semantics. Product-specific acceptance stays inside the child job.
+
+## Current Factory boundary
+
+Build next only after the minimal runner itself has a real Windows PASS:
+- no queue;
+- no watcher/service;
+- no encrypted feed/HMAC/DPAPI;
+- no automatic outbound upload;
+- no Director log reading or PowerShell debugging.
+
+The next Factory milestone is a real Spectre PASS of the standalone runner self-test, with \`RESULT.zip\` proving the allowlist contract and artifact separation.
