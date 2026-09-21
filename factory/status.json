@@ -13,13 +13,13 @@
   "controller_view": {
     "machine_live_heartbeat_available": true,
     "live_machine_state": "WATCHER_ACTIVE_PAYLOAD_PICKUP_CONFIRMED",
-    "last_confirmed_machine_evidence": "v1.0.8 REPAIRED_PICKUP_CONFIRMED at 2026-09-21T12:29:37+09:00",
+    "last_confirmed_machine_evidence": "v1.0.8 REPAIRED_PICKUP_CONFIRMED",
     "active_job": "clinic-cockpit-rc3-r2-20260921-001",
     "active_job_state": "PAYLOAD_REQUESTED_RUNTIME_RESULT_PENDING",
     "next_job": "tanuki-comic-gate-a-v08-20260921-queued",
     "queue_depth": 3,
     "outbound_result_return_connected": false,
-    "note": "Real watcher pickup confirmed from fresh armed supervisor counters. This is not self-test traffic.",
+    "note": "Real watcher pickup confirmed from fresh armed supervisor counters.",
     "likely_root_cause": "Unknown remote-feed/job-pickup failure. Install evidence shows TASK_STATE=Running and self-test AUTO_FEED_PROTOCOL=READY, so missing first logon is not the leading explanation.",
     "next_physical_action": "Run one-click Factory Doctor before reboot; inspect/repair watcher pickup path and install local OUTBOX notifier. Reboot only afterward to verify AT_LOGON persistence."
   },
