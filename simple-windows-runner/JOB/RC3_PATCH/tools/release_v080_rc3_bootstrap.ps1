@@ -27,7 +27,7 @@ function Write-BootstrapFailure([string]$Detail) {
         schema = "clinic-cockpit-no-github-windows-release-gate-v1"
         product = "Clinic Cockpit Lite"
         candidate = "v0.8.0 RC3"
-        frozen_commit = "33fffccf66ab66f4bf161af8f07797576a6379b7"
+        frozen_commit = "bf640bc9a58c3810b2d8cadde46b142054a18f3f"
         gate = "NO_GITHUB_WINDOWS_RELEASE_GATE"
         status = "FAIL"
         windows_candidate_pass = $false
