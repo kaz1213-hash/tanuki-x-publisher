@@ -52,22 +52,26 @@ function Git-BlobSha1Bytes([byte[]]$Raw){
     $header[$header.Length-1]=0
     $all=New-Object byte[] ($header.Length+$Raw.Length)
     [Array]::Copy($header,0,$all,0,$header.Length)
-    [Array]::Copy($Raw,0,$all,$header.Length,$Raw.Length)
+    [Array]::Copy($Raw,0,$all,$header.Length,$raw.Length)
     $sha=[Security.Cryptography.SHA1]::Create()
     try{return (($sha.ComputeHash($all)|ForEach-Object{$_.ToString('x2')}) -join '')}finally{$sha.Dispose()}
 }
 
 function Git-BlobSha1([string]$Path){
-    return Git-BlobSha1Bytes ([IO.File]::ReadAllBytes($Path))
+    $raw=[IO.File]::ReadAllBytes($Path)
+    $hash=Git-BlobSha1Bytes $raw
+    return $hash
 }
 
 function Test-GitBlob([string]$Path,[string]$Expected){
     $raw=[IO.File]::ReadAllBytes($Path)
-    if((Git-BlobSha1Bytes $raw) -eq $Expected){ return $true }
+    $hash=Git-BlobSha1Bytes $raw
+    if($hash -eq $Expected){ return $true }
     $text=[Text.Encoding]::UTF8.GetString($raw)
     if($text.Contains("`r`n")){
         $normalized=[Text.Encoding]::UTF8.GetBytes($text.Replace("`r`n","`n"))
-        if((Git-BlobSha1Bytes $normalized) -eq $Expected){ return $true }
+        $normalizedHash=Git-BlobSha1Bytes $normalized
+        if($normalizedHash -eq $Expected){ return $true }
     }
     return $false
 }
@@ -154,7 +158,7 @@ function Assert-StagedPackage([string]$StageRoot){
 }
 
 function Patch-ToCurrentFreeze([string]$StageRoot){
-    $Phase='PATCH_CURRENT_FREEZE'
+    $script:Phase='PATCH_CURRENT_FREEZE'
 
     $release=Join-Path $StageRoot 'RELEASE_CANDIDATE.json'
     if(-not(Test-GitBlob $release $ExpectedReleaseBlob)){
@@ -205,7 +209,7 @@ function Write-ExactStartHere([string]$Path){
 }
 
 function Start-FinalVisualTouch([string]$DeliveredZip,[string]$ArtifactRoot){
-    $Phase='PREPARE_FINAL_VISUAL_TOUCH'
+    $script:Phase='PREPARE_FINAL_VISUAL_TOUCH'
     $touchRoot=Join-Path $ArtifactRoot 'FINAL_TOUCH'
     if(Test-Path -LiteralPath $touchRoot){Remove-Item -LiteralPath $touchRoot -Recurse -Force}
     New-Item -ItemType Directory -Path $touchRoot -Force|Out-Null
