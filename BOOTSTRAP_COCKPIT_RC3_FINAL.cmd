@@ -1,11 +1,12 @@
 @echo off
 setlocal EnableExtensions
-set "PAYLOAD_COMMIT=0264965e936e921d648b784b43ff1dfb5bc87b1a"
-set "WORK=%LOCALAPPDATA%\TanukiFactory\CockpitRC3Final_0264965e"
-set "ARCHIVE=%TEMP%\TanukiCockpitRC3Final_0264965e.zip"
+set "PAYLOAD_COMMIT=d7623baa2b58a21013fd89a54349d48c8cf0b2bf"
+set "WORK=%LOCALAPPDATA%\TanukiFactory\CockpitRC3Final_d7623baa"
+set "ARCHIVE=%TEMP%\TanukiCockpitRC3Final_d7623baa.zip"
 
 echo ============================================================
 echo   Tanuki Windows Factory - Clinic Cockpit RC3 Final
+echo   Self-contained canonical package lane
 echo   Exact payload: %PAYLOAD_COMMIT%
 echo ============================================================
 echo.
@@ -26,7 +27,7 @@ if "%RC%"=="0" exit /b 0
 
 echo.
 echo The Factory stopped safely. No debugging is required from you.
-echo The downloaded payload has already captured bounded evidence.
+echo The payload already captured privacy-bounded evidence.
 pause
 exit /b %RC%
 
