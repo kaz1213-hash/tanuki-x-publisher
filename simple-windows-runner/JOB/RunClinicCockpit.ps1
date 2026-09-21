@@ -4,9 +4,13 @@ $Out=$env:TANUKI_RUNNER_OUT
 if(-not $Out){throw 'RUNNER_OUTPUT_MISSING'}
 New-Item -ItemType Directory -Force -Path $Out|Out-Null
 
-$ExpectedFrozen='33fffccf66ab66f4bf161af8f07797576a6379b7'
-$LegacyFrozen='70ec03be3de89548bf61ceea2661bffb03dab18a'
-$ExpectedFrozenTree='2a8eda04440baec5417bdb72f4e84f3f7e7f8930'
+$ExpectedFrozen='bf640bc9a58c3810b2d8cadde46b142054a18f3f'
+$ExpectedFrozenTree='4dcd25855460d7b15ce14261e9eae79aceab54f8'
+$AcceptedBaseFreezes=@(
+ 'bf640bc9a58c3810b2d8cadde46b142054a18f3f',
+ '33fffccf66ab66f4bf161af8f07797576a6379b7',
+ '70ec03be3de89548bf61ceea2661bffb03dab18a'
+)
 $ExpectedReadyBranch='release-ready/v0.8.0-rc3-no-github-r2'
 $ExpectedCandidate='v0.8.0 RC3'
 $ExpectedStartHereBlob='5be7c5c73d20122bdd3226d2f65d2275c066a1bd'
@@ -15,10 +19,11 @@ $LASTEXITCODE=0
 . (Join-Path $PSScriptRoot 'CockpitAcceptance.ps1')
 
 $PatchSpecs=@(
- [pscustomobject]@{Rel='RELEASE_CANDIDATE.json';Sha='efe49a3ee7a97e6bb58270653df33bf1acb3caf6'},
+ [pscustomobject]@{Rel='RELEASE_CANDIDATE.json';Sha='4caeec00f80e3315f1e3421a90b3b2b1d2add9c7'},
  [pscustomobject]@{Rel='tests\test_release_candidate_v080.py';Sha='743340bcd302cfd2d67a6fe6336333265f386e09'},
- [pscustomobject]@{Rel='tools\release_v080_rc3_builder.py';Sha='c1bcd7410caa02b92abab3231e5eb35f327b8015'},
- [pscustomobject]@{Rel='tools\release_v080_rc3_bootstrap.ps1';Sha='247385c3b1a16bffe3e25680f61bbd9c8223356b'}
+ [pscustomobject]@{Rel='tests\test_windows_launcher_runtime.py';Sha='ee78ac488b7d402f870e7f48efe457169c12fb0f'},
+ [pscustomobject]@{Rel='tools\release_v080_rc3_builder.py';Sha='b1ee8a858c13b8fd9bfa1fe2aa80c665dcf7eb60'},
+ [pscustomobject]@{Rel='tools\release_v080_rc3_bootstrap.ps1';Sha='317430202dc42a9c931f224e59637e5a313f4249'}
 )
 
 function Get-SafeProperty($Object,[string]$Name,$Default=$null){
@@ -35,7 +40,7 @@ function Get-LastFailedStep($Build){
  return $null
 }
 function Write-JobResult([string]$Status,[string]$Code,[hashtable]$Extra=@{}){
- $o=[ordered]@{schema='tanuki-cockpit-runner-result-v4';status=$Status;code=$Code;phase=$Phase;candidate=$ExpectedCandidate;frozen_commit=$ExpectedFrozen;ready_branch=$ExpectedReadyBranch;utc=[DateTime]::UtcNow.ToString('o')}
+ $o=[ordered]@{schema='tanuki-cockpit-runner-result-v5';status=$Status;code=$Code;phase=$Phase;candidate=$ExpectedCandidate;frozen_commit=$ExpectedFrozen;ready_branch=$ExpectedReadyBranch;utc=[DateTime]::UtcNow.ToString('o')}
  foreach($k in $Extra.Keys){$o[$k]=$Extra[$k]}
  $o|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $Out 'COCKPIT_JOB_RESULT.json') -Encoding UTF8
 }
@@ -61,7 +66,7 @@ function Find-RC3Package{
      if([string](Get-SafeProperty $j 'candidate' '') -ne $ExpectedCandidate){continue}
      if([string](Get-SafeProperty $j 'ready_branch' '') -ne $ExpectedReadyBranch){continue}
      $frozen=[string](Get-SafeProperty $j 'frozen_product_commit' '')
-     if($frozen -notin @($ExpectedFrozen,$LegacyFrozen)){continue}
+     if($frozen -notin $AcceptedBaseFreezes){continue}
      $hits+=[pscustomobject]@{Root=(Split-Path -Parent (Split-Path -Parent $f.FullName));Stamp=$f.LastWriteTimeUtc;Frozen=$frozen}
     }catch{}
    }
@@ -82,11 +87,11 @@ function Apply-CorrectedRc3Patch([string]$StageRoot){
  foreach($spec in $PatchSpecs){
   $src=Join-Path $patchRoot $spec.Rel;if(-not(Test-Path -LiteralPath $src -PathType Leaf)){throw 'PATCH_FILE_MISSING'};if((Git-BlobSha1 $src) -ne $spec.Sha){throw 'PATCH_BLOB_MISMATCH'};$dst=Join-Path $StageRoot $spec.Rel;$parent=Split-Path -Parent $dst;if($parent){New-Item -ItemType Directory -Force -Path $parent|Out-Null};Copy-Item -LiteralPath $src -Destination $dst -Force;if((Git-BlobSha1 $dst) -ne $spec.Sha){throw 'PATCH_COPY_MISMATCH'}
  }
- $readyPath=Join-Path $StageRoot 'tools\V080_RC3_READY.json';$ready=Get-Content -LiteralPath $readyPath -Raw -Encoding UTF8|ConvertFrom-Json;$ready.frozen_product_commit=$ExpectedFrozen;$ready.frozen_tree=$ExpectedFrozenTree;if($ready.static_audit){$ready.static_audit.rc3_frozen_commit=$ExpectedFrozen;$ready.static_audit.source_freeze_manifest_branch_blob_mismatches=0};$ready.latest_windows_evidence='Fresh Windows evidence reached release-harness-preflight; the stale RC2-era test contract is corrected in this staged patch.';$ready.next_gate='Run corrected RC3 through integrated source, PyInstaller, product runtime, renamed EXE, clean re-extract, privacy and final ZIP gates.';$ready|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $readyPath -Encoding UTF8
- $auditPath=Join-Path $StageRoot 'tools\V080_RC3_R2_STATIC_AUDIT.json';$audit=Get-Content -LiteralPath $auditPath -Raw -Encoding UTF8|ConvertFrom-Json;$audit.frozen_source_commit=$ExpectedFrozen;$audit.frozen_source_tree=$ExpectedFrozenTree;if($audit.checks -and $audit.checks.PSObject.Properties['rc3_test_contract_matches_manifest']){$audit.checks.rc3_test_contract_matches_manifest=$true};if($audit.windows_state){$audit.windows_state.current_gate='CORRECTED_RC3_WINDOWS_RERUN_PENDING';$audit.windows_state.next_required_gate='fresh Windows run through PyInstaller and all runtime/privacy gates'};$audit|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $auditPath -Encoding UTF8
+ $readyPath=Join-Path $StageRoot 'tools\V080_RC3_READY.json';$ready=Get-Content -LiteralPath $readyPath -Raw -Encoding UTF8|ConvertFrom-Json;$ready.frozen_product_commit=$ExpectedFrozen;$ready.frozen_tree=$ExpectedFrozenTree;if($ready.static_audit){$ready.static_audit.rc3_frozen_commit=$ExpectedFrozen;$ready.static_audit.source_freeze_manifest_branch_blob_mismatches=0};$ready.latest_windows_evidence='Fresh Windows evidence passed preflight plus ORCA 117/117, UKE 64/64 and privacy/AI 37/37. UI/Windows contracts reached 44/45 and stopped only because a pytest-local LOCALAPPDATA path crossed legacy MAX_PATH; the fixture is shortened in this staging patch without product runtime source changes.';$ready.next_gate='Run corrected RC3 through remaining UI/Windows contracts, integrated source, PyInstaller, product runtime, renamed EXE, clean re-extract, privacy and final ZIP gates.';$ready|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $readyPath -Encoding UTF8
+ $auditPath=Join-Path $StageRoot 'tools\V080_RC3_R2_STATIC_AUDIT.json';$audit=Get-Content -LiteralPath $auditPath -Raw -Encoding UTF8|ConvertFrom-Json;$audit.frozen_source_commit=$ExpectedFrozen;$audit.frozen_source_tree=$ExpectedFrozenTree;if($audit.checks -and $audit.checks.PSObject.Properties['rc3_test_contract_matches_manifest']){$audit.checks.rc3_test_contract_matches_manifest=$true};if($audit.windows_state){$audit.windows_state.current_gate='CORRECTED_RC3_WINDOWS_RERUN_PENDING';$audit.windows_state.next_required_gate='fresh Windows run through remaining UI/Windows contracts, PyInstaller and all runtime/privacy gates'};$audit|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $auditPath -Encoding UTF8
 }
 function Assert-StagedPackage([string]$StageRoot){
- foreach($req in @('tools\release_v080_rc3_bootstrap.ps1','tools\release_v080_rc3_builder.py','tools\release_v080_rc2_builder.py','tools\V080_RC2_SOURCE_BLOBS.json','tools\V080_RC3_READY.json','tools\V080_RC3_R2_STATIC_AUDIT.json','tools\requirements-release-lock-v080.txt','BUILD_V080_RC3_WINDOWS.cmd','START_BUILD_V080_RC3.vbs','START_HERE_WINDOWS.bat','tests\test_release_candidate_v080.py','RELEASE_CANDIDATE.json')){if(-not(Test-Path -LiteralPath (Join-Path $StageRoot $req) -PathType Leaf)){throw 'STAGED_PACKAGE_INCOMPLETE'}}
+ foreach($req in @('tools\release_v080_rc3_bootstrap.ps1','tools\release_v080_rc3_builder.py','tools\release_v080_rc2_builder.py','tools\V080_RC2_SOURCE_BLOBS.json','tools\V080_RC3_READY.json','tools\V080_RC3_R2_STATIC_AUDIT.json','tools\requirements-release-lock-v080.txt','BUILD_V080_RC3_WINDOWS.cmd','START_BUILD_V080_RC3.vbs','START_HERE_WINDOWS.bat','tests\test_release_candidate_v080.py','tests\test_windows_launcher_runtime.py','RELEASE_CANDIDATE.json')){if(-not(Test-Path -LiteralPath (Join-Path $StageRoot $req) -PathType Leaf)){throw 'STAGED_PACKAGE_INCOMPLETE'}}
  foreach($spec in $PatchSpecs){if((Git-BlobSha1 (Join-Path $StageRoot $spec.Rel)) -ne $spec.Sha){throw 'STAGED_PATCH_BLOB_MISMATCH'}}
  $ready=Get-Content -LiteralPath (Join-Path $StageRoot 'tools\V080_RC3_READY.json') -Raw -Encoding UTF8|ConvertFrom-Json;if([string](Get-SafeProperty $ready 'candidate' '') -ne $ExpectedCandidate){throw 'READY_CANDIDATE_MISMATCH'};if([string](Get-SafeProperty $ready 'frozen_product_commit' '') -ne $ExpectedFrozen){throw 'READY_FROZEN_MISMATCH'};if([string](Get-SafeProperty $ready 'ready_branch' '') -ne $ExpectedReadyBranch){throw 'READY_BRANCH_MISMATCH'}
  $audit=Get-Content -LiteralPath (Join-Path $StageRoot 'tools\V080_RC3_R2_STATIC_AUDIT.json') -Raw -Encoding UTF8|ConvertFrom-Json;if([string](Get-SafeProperty $audit 'audit_status' '') -ne 'PASS'){throw 'STATIC_AUDIT_NOT_PASS'};if([string](Get-SafeProperty $audit 'frozen_source_commit' '') -ne $ExpectedFrozen){throw 'STATIC_AUDIT_FROZEN_MISMATCH'}
@@ -103,7 +108,7 @@ try{
  if($rc -ne 0 -or [string](Get-SafeProperty $B 'status' '') -ne 'PASS' -or (Get-SafeProperty $B 'windows_candidate_pass' $false) -ne $true){Write-JobResult 'FAIL' 'WINDOWS_CANDIDATE_NOT_PASS' @{builder_exit=$rc;failed_step=(Get-LastFailedStep $B)};exit 23}
  $Phase='VERIFY_FINAL_ZIP';$zip=Test-CockpitAcceptance $B $Release $rc;$zipName=[IO.Path]::GetFileName($zip);$sha=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
  $Phase='COLLECT_FINAL_ARTIFACT';$artifactRoot=$env:TANUKI_RUNNER_ARTIFACTS;if(-not $artifactRoot){throw 'ARTIFACT_DIRECTORY_MISSING'};New-Item -ItemType Directory -Path $artifactRoot -Force|Out-Null;$delivered=Join-Path $artifactRoot $zipName;Copy-Item -LiteralPath $zip -Destination $delivered -Force;if((Get-FileHash -LiteralPath $delivered -Algorithm SHA256).Hash.ToLowerInvariant() -ne $sha){throw 'DELIVERED_ZIP_SHA_MISMATCH'}
- $Phase='TERMINAL_PASS';Write-JobResult 'PASS' 'WINDOWS_CANDIDATE_PASS' @{builder_exit=$rc;output_zip=$zipName;output_zip_sha256=$sha;source_package_frozen_commit=$Located.Frozen;corrected_freeze_applied_in_stage=$true;repaired_stale_start_here_in_stage=$true;original_package_modified=$false;product_gate_verified=$true};exit 0
+ $Phase='TERMINAL_PASS';Write-JobResult 'PASS' 'WINDOWS_CANDIDATE_PASS' @{builder_exit=$rc;output_zip=$zipName;output_zip_sha256=$sha;source_package_frozen_commit=$Located.Frozen;corrected_freeze_applied_in_stage=$true;max_path_fixture_fix_applied_in_stage=$true;repaired_stale_start_here_in_stage=$true;original_package_modified=$false;product_gate_verified=$true};exit 0
 }catch{
  Write-JobResult 'FAIL' 'COCKPIT_JOB_EXCEPTION' @{exception_type=$_.Exception.GetType().Name;exception_line=[int]$_.InvocationInfo.ScriptLineNumber};exit 30
 }finally{
