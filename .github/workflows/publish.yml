@@ -2,6 +2,8 @@ name: Tanuki X Free Publisher
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "40 11 * * *"
   push:
     paths:
       - "wake/**"
