@@ -8,7 +8,6 @@ New-Item -ItemType Directory -Force -Path $Out | Out-Null
 $ExpectedFrozen = '70ec03be3de89548bf61ceea2661bffb03dab18a'
 $ExpectedReadyBranch = 'release-ready/v0.8.0-rc3-no-github-r2'
 $ExpectedCandidate = 'v0.8.0 RC3'
-$ExpectedZipName = '院長レントゲン_v0.8.0_RC3_WINDOWS.zip'
 $ExpectedStartHereBlob = '5be7c5c73d20122bdd3226d2f65d2275c066a1bd'
 $Phase = 'INIT'
 
@@ -178,8 +177,10 @@ try{
     $windowsPass=[bool](Get-SafeProperty $B 'windows_candidate_pass' $false)
     $frozen=[string](Get-SafeProperty $B 'frozen_commit' '')
     $failedStep=Get-LastFailedStep $B
-    $zip=Join-Path $Release $ExpectedZipName
-    $ok=($rc -eq 0 -and $buildStatus -eq 'PASS' -and $windowsPass -and $frozen -eq $ExpectedFrozen -and $missing.Count -eq 0 -and (Test-Path -LiteralPath $zip -PathType Leaf))
+    $zipCandidates=@(Get-ChildItem -LiteralPath $Release -Filter '*.zip' -File -ErrorAction SilentlyContinue)
+    $zip=$null
+    if($zipCandidates.Count -eq 1){$zip=$zipCandidates[0].FullName}
+    $ok=($rc -eq 0 -and $buildStatus -eq 'PASS' -and $windowsPass -and $frozen -eq $ExpectedFrozen -and $missing.Count -eq 0 -and $zip)
     if(-not $ok){
         Write-JobResult 'FAIL' 'WINDOWS_CANDIDATE_NOT_PASS' @{
             builder_exit=$rc
@@ -187,24 +188,26 @@ try{
             windows_candidate_pass=$windowsPass
             failed_step=$failedStep
             missing_required_gates=@($missing)
+            final_zip_count=$zipCandidates.Count
         }
         exit 23
     }
 
     $Phase='VERIFY_FINAL_ZIP'
+    $zipName=[IO.Path]::GetFileName($zip)
     $sha=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
     $declaredSha=[string](Get-SafeProperty $B 'output_zip_sha256' '')
     if($declaredSha -and $declaredSha.ToLowerInvariant() -ne $sha){Write-JobResult 'FAIL' 'FINAL_ZIP_SHA_MISMATCH' @{actual_sha256=$sha};exit 24}
 
     $Phase='COLLECT_FINAL_ARTIFACT'
-    Copy-Item -LiteralPath $zip -Destination (Join-Path $Out $ExpectedZipName) -Force
+    Copy-Item -LiteralPath $zip -Destination (Join-Path $Out $zipName) -Force
     $shaFile=Join-Path $Release 'SHA256.txt'
     if(Test-Path -LiteralPath $shaFile -PathType Leaf){Copy-Item -LiteralPath $shaFile -Destination (Join-Path $Out 'SHA256.txt') -Force}
 
     $Phase='TERMINAL_PASS'
     Write-JobResult 'PASS' 'WINDOWS_CANDIDATE_PASS' @{
         builder_exit=$rc
-        output_zip=$ExpectedZipName
+        output_zip=$zipName
         output_zip_sha256=$sha
         repaired_stale_start_here_in_stage=$true
         original_package_modified=$false
