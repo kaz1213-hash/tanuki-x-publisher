@@ -1,6 +1,6 @@
 {
   "schema": "tanuki-windows-factory-controller-status-v1",
-  "updated_utc": "2026-09-21T04:29:54.958Z",
+  "updated_utc": "2026-09-21T06:50:23Z",
   "factory": {
     "name": "spectre-win11",
     "id": "ed813f7bf5ebbd7fabb4819b769ac2182116d41a7c172992dae03d4e4c4cf10f",
@@ -16,10 +16,10 @@
     "last_confirmed_machine_evidence": "v1.0.8 REPAIRED_PICKUP_CONFIRMED",
     "active_job": "clinic-cockpit-rc3-r2-20260921-001",
     "active_job_state": "PAYLOAD_REQUEST_CONFIRMED_EXECUTION_AND_LOCAL_RESULT_UNOBSERVED",
-    "next_job": "tanuki-comic-gate-a-v08-20260921-queued",
-    "queue_depth": 3,
+    "next_job": "fx-university-windows-native-next",
+    "queue_depth": 2,
     "outbound_result_return_connected": false,
-    "note": "A returned one-time pickup report is not a live heartbeat. Outbound result transport is not connected; no GitHub result does not prove a Windows hang.",
+    "note": "A returned one-time pickup report is not a live heartbeat. Outbound result transport is not connected; no GitHub result does not prove a Windows hang. Superseded Tanuki Comic #31 recovery was removed from the factory queue; canonical Comic work is now #35 vNext and must not block FX P0.",
     "likely_root_cause": "HMACSHA256 New-Object byte-array constructor failure reproduced on PowerShell 7.4.19 Linux. Spectre failure phase remains unconfirmed.",
     "next_physical_action": "NONE: staged repair is not Windows-qualified; result return and actual machine evidence remain missing. Do not request another Director debug run.",
     "repair_pr": "https://github.com/kaz1213-hash/tanuki-x-publisher/pull/2",
