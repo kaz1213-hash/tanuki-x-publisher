@@ -2,7 +2,7 @@
 setlocal EnableExtensions
 cd /d "%~dp0"
 echo ============================================================
-echo   Tanuki Windows Runner v0.3
+echo   Tanuki Windows Runner v0.5
 echo ============================================================
 echo.
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0RunJob.ps1"
