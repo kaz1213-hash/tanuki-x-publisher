@@ -1,0 +1,74 @@
+{
+  "schema": "clinic-cockpit-release-candidate-manifest-v1",
+  "product": "院長レントゲン / Clinic Cockpit Lite",
+  "candidate_version": "0.8.0-ophthalmology-pack-working",
+  "candidate_label": "v0.8.0 RC3 SOURCE FREEZE",
+  "entrypoint": "app_v067.py",
+  "windows_launcher": "windows_launcher_v062.py",
+  "windows_runtime_key": "v080w",
+  "verified_base": "v0.6.6 real-clinic-passed ORCA UI",
+  "source_branch": "release/v0.8.0-rc3-source-freeze",
+  "source_completion_gate": "python run_local_gate.py",
+  "release_pass": false,
+  "source_contracts": {
+    "orca_dashboard_preserved": true,
+    "catchment_map_preserved": true,
+    "patient_attributes_preserved": true,
+    "multi_uke": true,
+    "same_service_month_orca_uke_alignment": true,
+    "privacy_small_cell_suppression": true,
+    "privacy_post_enrichment_scan": true,
+    "official_mhlw_master_mapping": true,
+    "director_30_second_readout": true,
+    "chatgpt_entrypoint": "今月どう？",
+    "ophthalmology_four_pillars": true
+  },
+  "external_release_gates_pending": [
+    "full integrated regression execution after RC3 tab UX change",
+    "Windows PyInstaller build after RC3 tab UX change",
+    "Windows runtime product gate after RC3 tab UX change",
+    "real-clinic visual touch confirmation for dedicated UKE and ChatGPT tabs"
+  ],
+  "release_rule": "Do not call Release PASS until every external release gate is PASS.",
+  "source_freeze": true,
+  "source_freeze_parent": "1f99cff64812a05c75b3c6b17cd80acbf97bdd00",
+  "rc2_changes": {
+    "product_fixes": [
+      "latest_service_age_summary excludes pandas NaN/blank patient_key values and normalizes missing age bands safely"
+    ],
+    "test_contract_fixes": [
+      "corrupt UKE history empty months assertion uses mapping schema",
+      "privacy metadata patient_key_included=false is not mistaken for exported patient-key content",
+      "ophthalmology UI split literals are tested without requiring impossible contiguous source text",
+      "v0.6.2 Streamlit smoke resolves app path from __file__ instead of pytest cwd"
+    ]
+  },
+  "source_freeze_reason": "RC2 passed the Windows Candidate gate, then real-clinic touch testing exposed a layout defect: the full UKE workspace rendered below the legacy tab body and appeared duplicated across the ORCA tab experience. RC3 contains only the bounded Director-requested correction: dedicated top-level UKE and ChatGPT tabs, removal of the below-all-tabs UKE workspace/sidebar toggle, preservation of the seven verified ORCA tabs, and preservation of the compact four-pillar management snapshot. Release PASS remains fail-closed pending regression, Windows runtime, and one final real-clinic visual touch.",
+  "rc3_changes": {
+    "source": "real-clinic touch feedback after RC2 Windows Candidate PASS",
+    "ui": [
+      "preserve the seven verified ORCA tabs",
+      "move full UKE analysis into one dedicated top-level tab",
+      "move ChatGPT management consultation into one dedicated top-level tab",
+      "remove the old below-all-tabs UKE workspace and sidebar visibility toggle",
+      "retain only the compact ophthalmology four-pillar snapshot inside the management dashboard"
+    ],
+    "data_evidence": [
+      "two UKE source files imported successfully for request month 2026-09",
+      "536 + 693 claims merged to 1229 claims",
+      "Privacy Gate PASS and AI consultation readiness PASS"
+    ],
+    "static_scope": {
+      "files_changed_from_rc2": [
+        "app_v060.py",
+        "app_v067.py",
+        "uke_ui.py",
+        "tests/test_app_v067_persistence.py",
+        "RELEASE_CANDIDATE.json",
+        "tests/test_release_candidate_v080.py"
+      ],
+      "feature_expansion": false
+    },
+    "test_contract_fix": "align fail-closed external release gate assertions with RC3-specific pending gate names"
+  }
+}
