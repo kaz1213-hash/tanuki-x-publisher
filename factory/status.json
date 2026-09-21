@@ -20,11 +20,11 @@
     "queue_depth": 3,
     "outbound_result_return_connected": false,
     "note": "Real watcher pickup confirmed from fresh armed supervisor counters.",
-    "likely_root_cause": "Unknown remote-feed/job-pickup failure. Install evidence shows TASK_STATE=Running and self-test AUTO_FEED_PROTOCOL=READY, so missing first logon is not the leading explanation.",
-    "next_physical_action": "Run one-click Factory Doctor before reboot; inspect/repair watcher pickup path and install local OUTBOX notifier. Reboot only afterward to verify AT_LOGON persistence."
+    "likely_root_cause": "RESOLVED_IN_V1.0.8: the prior remote-feed/job-pickup failure is no longer active; real Cockpit payload pickup is confirmed.",
+    "next_physical_action": "NONE. Director intervention is not required. Await the Cockpit runtime result in Factory OUTBOX/result return path."
   },
   "desired_v11_visibility": {
-    "state": "PLANNED",
+    "state": "PARTIAL",
     "requirement": "Spectre itself should expose a persistent visible status showing watcher alive, last poll, active job, last result, and next queued job.",
     "preferred_surface": "small always-available local status window or tray indicator; no Director debugging steps",
     "install_behavior": "Installer must verify live feed pickup after install, not merely scheduled-task Running state."
