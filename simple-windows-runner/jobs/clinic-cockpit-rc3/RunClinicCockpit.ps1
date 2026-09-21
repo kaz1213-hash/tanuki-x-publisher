@@ -6,19 +6,17 @@ if(-not $Out){ throw 'RUNNER_OUTPUT_MISSING' }
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 
 $ExpectedFrozen = 'bf640bc9a58c3810b2d8cadde46b142054a18f3f'
-$PreviousFrozen = '33fffccf66ab66f4bf161af8f07797576a6379b7'
+$ExpectedFrozenTree = '4dcd25855460d7b15ce14261e9eae79aceab54f8'
 $ExpectedReadyBranch = 'release-ready/v0.8.0-rc3-no-github-r2'
+$ExpectedReadyCommit = '7bd55eb7010fe20f233506cea0ac11a6a48c9449'
 $ExpectedCandidate = 'v0.8.0 RC3'
 $ExpectedStartHereBlob = '5be7c5c73d20122bdd3226d2f65d2275c066a1bd'
 $ExpectedReleaseBlob = '4caeec00f80e3315f1e3421a90b3b2b1d2add9c7'
-$PreviousReleaseBlob = 'efe49a3ee7a97e6bb58270653df33bf1acb3caf6'
 $ExpectedLauncherTestBlob = 'ee78ac488b7d402f870e7f48efe457169c12fb0f'
-$PreviousLauncherTestBlob = '5ba963462b55a33555c9ca10ef906fd2618a6e69'
 $ExpectedAdapterBlob = '7fc0b9e9252adef250654db645c20db86f323aad'
-$PreviousAdapterBlob = '1e422cb5d207ab7c44e39c923b34267a6c90d048'
 $ExpectedBootstrapBlob = '50dd8176ab2183c0f5daa82971964ef0a3ac86f1'
-$PreviousBootstrapBlob = '313613ce6ac899b03bd54587af9382cd04bd345b'
 $ExpectedBaseBuilderBlob = '866bf993f83a6add72f2593b579ba7f408eb8536'
+$ReadyArchiveUrl = 'https://github.com/kaz1213-hash/clinic-cockpit-lite/archive/' + $ExpectedReadyCommit + '.zip'
 $Phase = 'INIT'
 $LASTEXITCODE = 0
 . (Join-Path $PSScriptRoot 'CockpitAcceptance.ps1')
@@ -32,13 +30,14 @@ function Get-SafeProperty($Object,[string]$Name,$Default=$null){
 
 function Write-JobResult([string]$Status,[string]$Code,[hashtable]$Extra=@{}){
     $o=[ordered]@{
-        schema='tanuki-cockpit-runner-result-v4'
+        schema='tanuki-cockpit-runner-result-v5'
         status=$Status
         code=$Code
         phase=$Phase
         candidate=$ExpectedCandidate
         frozen_commit=$ExpectedFrozen
         ready_branch=$ExpectedReadyBranch
+        ready_commit=$ExpectedReadyCommit
         utc=[DateTime]::UtcNow.ToString('o')
     }
     foreach($k in $Extra.Keys){$o[$k]=$Extra[$k]}
@@ -52,93 +51,51 @@ function Git-BlobSha1Bytes([byte[]]$Raw){
     $header[$header.Length-1]=0
     $all=New-Object byte[] ($header.Length+$Raw.Length)
     [Array]::Copy($header,0,$all,0,$header.Length)
-    [Array]::Copy($Raw,0,$all,$header.Length,$raw.Length)
+    [Array]::Copy($Raw,0,$all,$header.Length,$Raw.Length)
     $sha=[Security.Cryptography.SHA1]::Create()
     try{return (($sha.ComputeHash($all)|ForEach-Object{$_.ToString('x2')}) -join '')}finally{$sha.Dispose()}
 }
 
-function Git-BlobSha1([string]$Path){
-    $raw=[IO.File]::ReadAllBytes($Path)
-    $hash=Git-BlobSha1Bytes $raw
-    return $hash
-}
-
 function Test-GitBlob([string]$Path,[string]$Expected){
+    if(-not(Test-Path -LiteralPath $Path -PathType Leaf)){return $false}
     $raw=[IO.File]::ReadAllBytes($Path)
     $hash=Git-BlobSha1Bytes $raw
     if($hash -eq $Expected){ return $true }
     $text=[Text.Encoding]::UTF8.GetString($raw)
     if($text.Contains("`r`n")){
         $normalized=[Text.Encoding]::UTF8.GetBytes($text.Replace("`r`n","`n"))
-        $normalizedHash=Git-BlobSha1Bytes $normalized
-        if($normalizedHash -eq $Expected){ return $true }
+        if((Git-BlobSha1Bytes $normalized) -eq $Expected){ return $true }
     }
     return $false
 }
 
-function Write-Utf8Lf([string]$Path,[string]$Text){
-    $Text=$Text.Replace("`r`n","`n").Replace("`r","`n")
-    [IO.File]::WriteAllText($Path,$Text,(New-Object Text.UTF8Encoding($false)))
+function Acquire-CanonicalReadyPackage([string]$ExtractRoot,[string]$ArchivePath){
+    $script:Phase='DOWNLOAD_CANONICAL_READY_PACKAGE'
+    if(Test-Path -LiteralPath $ArchivePath){Remove-Item -LiteralPath $ArchivePath -Force}
+    if(Test-Path -LiteralPath $ExtractRoot){Remove-Item -LiteralPath $ExtractRoot -Recurse -Force}
+    New-Item -ItemType Directory -Path $ExtractRoot -Force|Out-Null
+
+    [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -UseBasicParsing -Uri $ReadyArchiveUrl -OutFile $ArchivePath
+    if(-not(Test-Path -LiteralPath $ArchivePath -PathType Leaf)){throw 'READY_ARCHIVE_DOWNLOAD_MISSING'}
+    if((Get-Item -LiteralPath $ArchivePath).Length -lt 1024){throw 'READY_ARCHIVE_DOWNLOAD_TOO_SMALL'}
+
+    $script:Phase='EXPAND_CANONICAL_READY_PACKAGE'
+    Expand-Archive -LiteralPath $ArchivePath -DestinationPath $ExtractRoot -Force
+    $readyFiles=@(Get-ChildItem -LiteralPath $ExtractRoot -Filter 'V080_RC3_READY.json' -File -Recurse -ErrorAction Stop | Where-Object {$_.FullName -match '\\tools\\V080_RC3_READY\.json$'})
+    if($readyFiles.Count -ne 1){throw 'READY_MANIFEST_NOT_UNIQUE'}
+
+    $ready=Get-Content -LiteralPath $readyFiles[0].FullName -Raw -Encoding UTF8|ConvertFrom-Json
+    if([string](Get-SafeProperty $ready 'candidate' '') -ne $ExpectedCandidate){throw 'READY_CANDIDATE_MISMATCH'}
+    if([string](Get-SafeProperty $ready 'ready_branch' '') -ne $ExpectedReadyBranch){throw 'READY_BRANCH_MISMATCH'}
+    if([string](Get-SafeProperty $ready 'frozen_product_commit' '') -ne $ExpectedFrozen){throw 'READY_FROZEN_COMMIT_MISMATCH'}
+    if([string](Get-SafeProperty $ready 'frozen_tree' '') -ne $ExpectedFrozenTree){throw 'READY_FROZEN_TREE_MISMATCH'}
+
+    return (Split-Path -Parent (Split-Path -Parent $readyFiles[0].FullName))
 }
 
-function Replace-One([string]$Text,[string]$Old,[string]$New){
-    $count=([regex]::Matches($Text,[regex]::Escape($Old))).Count
-    if($count -ne 1){ throw 'PATCH_SOURCE_CONTRACT_MISMATCH' }
-    return $Text.Replace($Old,$New)
-}
-
-function CandidateRoots {
-    $list=New-Object System.Collections.Generic.List[string]
-    foreach($p in @(
-        'C:\TanukiFactory',
-        (Join-Path $env:USERPROFILE 'Downloads'),
-        ([Environment]::GetFolderPath('Desktop')),
-        ([Environment]::GetFolderPath('MyDocuments')),
-        (Split-Path -Parent $PSScriptRoot)
-    )){
-        if($p -and (Test-Path -LiteralPath $p -PathType Container)){$list.Add($p)}
-    }
-    return $list
-}
-
-function Find-RC3Package {
-    $hits=@()
-    foreach($root in CandidateRoots){
-        try{
-            $files=@(Get-ChildItem -LiteralPath $root -Filter 'V080_RC3_READY.json' -File -Recurse -ErrorAction SilentlyContinue)
-            foreach($f in $files){
-                if($f.FullName -notmatch '\\tools\\V080_RC3_READY\.json$'){continue}
-                try{
-                    $j=Get-Content -LiteralPath $f.FullName -Raw -Encoding UTF8|ConvertFrom-Json
-                    if([string](Get-SafeProperty $j 'candidate' '') -ne $ExpectedCandidate){continue}
-                    if([string](Get-SafeProperty $j 'ready_branch' '') -ne $ExpectedReadyBranch){continue}
-                    $freeze=[string](Get-SafeProperty $j 'frozen_product_commit' '')
-                    if($freeze -notin @($PreviousFrozen,$ExpectedFrozen)){continue}
-                    $pkg=Split-Path -Parent (Split-Path -Parent $f.FullName)
-                    $hits += [pscustomobject]@{Root=$pkg;Stamp=$f.LastWriteTimeUtc;Freeze=$freeze}
-                }catch{}
-            }
-        }catch{}
-    }
-    if($hits.Count -eq 0){return $null}
-    return ($hits|Sort-Object Stamp -Descending|Select-Object -First 1)
-}
-
-function Copy-PackageToStage([string]$Source,[string]$Destination){
-    $ignored=@('.git','RELEASE_OUTPUT_V080_RC2','RELEASE_OUTPUT_V080_RC3','__pycache__','.pytest_cache','.venv','venv')
-    New-Item -ItemType Directory -Force -Path $Destination|Out-Null
-    foreach($f in @(Get-ChildItem -LiteralPath $Source -Recurse -File -Force -ErrorAction Stop)){
-        $rel=$f.FullName.Substring($Source.TrimEnd('\').Length).TrimStart('\')
-        $parts=$rel -split '\\'
-        if(@($parts|Where-Object{$_ -in $ignored}).Count -gt 0){continue}
-        $dst=Join-Path $Destination $rel
-        $parent=Split-Path -Parent $dst
-        if($parent){New-Item -ItemType Directory -Force -Path $parent|Out-Null}
-        Copy-Item -LiteralPath $f.FullName -Destination $dst -Force
-    }
-}
-
-function Assert-StagedPackage([string]$StageRoot){
+function Assert-CanonicalPackage([string]$StageRoot){
+    $script:Phase='VERIFY_CANONICAL_READY_PACKAGE'
     foreach($req in @(
         'RELEASE_CANDIDATE.json',
         'tests\test_windows_launcher_runtime.py',
@@ -152,60 +109,15 @@ function Assert-StagedPackage([string]$StageRoot){
         'START_BUILD_V080_RC3.vbs',
         'START_HERE_WINDOWS.bat'
     )){
-        if(-not(Test-Path -LiteralPath (Join-Path $StageRoot $req) -PathType Leaf)){ throw 'STAGED_PACKAGE_INCOMPLETE' }
+        if(-not(Test-Path -LiteralPath (Join-Path $StageRoot $req) -PathType Leaf)){ throw 'CANONICAL_PACKAGE_INCOMPLETE' }
     }
+
+    if(-not(Test-GitBlob (Join-Path $StageRoot 'RELEASE_CANDIDATE.json') $ExpectedReleaseBlob)){throw 'RELEASE_MANIFEST_BLOB_MISMATCH'}
+    if(-not(Test-GitBlob (Join-Path $StageRoot 'tests\test_windows_launcher_runtime.py') $ExpectedLauncherTestBlob)){throw 'LAUNCHER_TEST_BLOB_MISMATCH'}
+    if(-not(Test-GitBlob (Join-Path $StageRoot 'tools\release_v080_rc3_builder.py') $ExpectedAdapterBlob)){throw 'RC3_ADAPTER_BLOB_MISMATCH'}
+    if(-not(Test-GitBlob (Join-Path $StageRoot 'tools\release_v080_rc3_bootstrap.ps1') $ExpectedBootstrapBlob)){throw 'RC3_BOOTSTRAP_BLOB_MISMATCH'}
     if(-not(Test-GitBlob (Join-Path $StageRoot 'tools\release_v080_rc2_builder.py') $ExpectedBaseBuilderBlob)){throw 'BASE_BUILDER_BLOB_MISMATCH'}
-}
-
-function Patch-ToCurrentFreeze([string]$StageRoot){
-    $script:Phase='PATCH_CURRENT_FREEZE'
-
-    $release=Join-Path $StageRoot 'RELEASE_CANDIDATE.json'
-    if(-not(Test-GitBlob $release $ExpectedReleaseBlob)){
-        if(-not(Test-GitBlob $release $PreviousReleaseBlob)){throw 'RELEASE_MANIFEST_SOURCE_UNEXPECTED'}
-        $src=Join-Path $PSScriptRoot 'PATCH\RELEASE_CANDIDATE.json'
-        if(-not(Test-GitBlob $src $ExpectedReleaseBlob)){throw 'PATCH_RELEASE_MANIFEST_INVALID'}
-        Copy-Item -LiteralPath $src -Destination $release -Force
-    }
-
-    $test=Join-Path $StageRoot 'tests\test_windows_launcher_runtime.py'
-    if(-not(Test-GitBlob $test $ExpectedLauncherTestBlob)){
-        if(-not(Test-GitBlob $test $PreviousLauncherTestBlob)){throw 'LAUNCHER_TEST_SOURCE_UNEXPECTED'}
-        $src=Join-Path $PSScriptRoot 'PATCH\test_windows_launcher_runtime.py'
-        if(-not(Test-GitBlob $src $ExpectedLauncherTestBlob)){throw 'PATCH_LAUNCHER_TEST_INVALID'}
-        Copy-Item -LiteralPath $src -Destination $test -Force
-    }
-
-    $adapter=Join-Path $StageRoot 'tools\release_v080_rc3_builder.py'
-    if(-not(Test-GitBlob $adapter $ExpectedAdapterBlob)){
-        if(-not(Test-GitBlob $adapter $PreviousAdapterBlob)){throw 'RC3_ADAPTER_SOURCE_UNEXPECTED'}
-        $text=[IO.File]::ReadAllText($adapter,[Text.Encoding]::UTF8).Replace("`r`n","`n").Replace("`r","`n")
-        $text=Replace-One $text 'RC3_FROZEN_COMMIT = "33fffccf66ab66f4bf161af8f07797576a6379b7"' 'RC3_FROZEN_COMMIT = "bf640bc9a58c3810b2d8cadde46b142054a18f3f"'
-        $text=Replace-One $text 'RC3_FROZEN_TREE = "2a8eda04440baec5417bdb72f4e84f3f7e7f8930"' 'RC3_FROZEN_TREE = "4dcd25855460d7b15ce14261e9eae79aceab54f8"'
-        $text=Replace-One $text '    "RELEASE_CANDIDATE.json": ("efe49a3ee7a97e6bb58270653df33bf1acb3caf6", 3819),' '    "RELEASE_CANDIDATE.json": ("4caeec00f80e3315f1e3421a90b3b2b1d2add9c7", 4104),'
-        $needle='    "tests/test_release_candidate_v080.py": ("743340bcd302cfd2d67a6fe6336333265f386e09", 2442),'
-        $insert=$needle+"`n"+'    "tests/test_windows_launcher_runtime.py": ("ee78ac488b7d402f870e7f48efe457169c12fb0f", 2691),'
-        $text=Replace-One $text $needle $insert
-        Write-Utf8Lf $adapter $text
-    }
-
-    $bootstrap=Join-Path $StageRoot 'tools\release_v080_rc3_bootstrap.ps1'
-    if(-not(Test-GitBlob $bootstrap $ExpectedBootstrapBlob)){
-        if(-not(Test-GitBlob $bootstrap $PreviousBootstrapBlob)){throw 'RC3_BOOTSTRAP_SOURCE_UNEXPECTED'}
-        $text=[IO.File]::ReadAllText($bootstrap,[Text.Encoding]::UTF8).Replace("`r`n","`n").Replace("`r","`n")
-        $text=Replace-One $text 'frozen_commit = "33fffccf66ab66f4bf161af8f07797576a6379b7"' 'frozen_commit = "bf640bc9a58c3810b2d8cadde46b142054a18f3f"'
-        Write-Utf8Lf $bootstrap $text
-    }
-
-    if(-not(Test-GitBlob $release $ExpectedReleaseBlob)){throw 'CURRENT_RELEASE_MANIFEST_BLOB_MISMATCH'}
-    if(-not(Test-GitBlob $test $ExpectedLauncherTestBlob)){throw 'CURRENT_LAUNCHER_TEST_BLOB_MISMATCH'}
-    if(-not(Test-GitBlob $adapter $ExpectedAdapterBlob)){throw 'CURRENT_RC3_ADAPTER_BLOB_MISMATCH'}
-    if(-not(Test-GitBlob $bootstrap $ExpectedBootstrapBlob)){throw 'CURRENT_RC3_BOOTSTRAP_BLOB_MISMATCH'}
-}
-
-function Write-ExactStartHere([string]$Path){
-    $text="@echo off`ncd /d %~dp0`npy -m pip install -r requirements.txt`npy -m streamlit run app.py`npause`n"
-    [IO.File]::WriteAllBytes($Path,[Text.Encoding]::ASCII.GetBytes($text))
+    if(-not(Test-GitBlob (Join-Path $StageRoot 'START_HERE_WINDOWS.bat') $ExpectedStartHereBlob)){throw 'START_HERE_FROZEN_BLOB_MISMATCH'}
 }
 
 function Start-FinalVisualTouch([string]$DeliveredZip,[string]$ArtifactRoot){
@@ -221,23 +133,14 @@ function Start-FinalVisualTouch([string]$DeliveredZip,[string]$ArtifactRoot){
     return $true
 }
 
-$Stage=$null
+$ExtractRoot=$null
+$ArchivePath=$null
 try{
-    $Phase='LOCATE_PACKAGE'
-    $located=Find-RC3Package
-    if($null -eq $located){Write-JobResult 'HOLD' 'RC3_PACKAGE_NOT_FOUND';exit 20}
-
-    $Phase='STAGE_PACKAGE'
     $nonce=[Guid]::NewGuid().ToString('N').Substring(0,8)
-    $Stage=Join-Path ([IO.Path]::GetTempPath()) ('TC3_'+$nonce)
-    Copy-PackageToStage $located.Root $Stage
-    Assert-StagedPackage $Stage
-    Patch-ToCurrentFreeze $Stage
-
-    $Phase='RESTORE_FROZEN_START_HERE'
-    $StartHere=Join-Path $Stage 'START_HERE_WINDOWS.bat'
-    Write-ExactStartHere $StartHere
-    if((Git-BlobSha1 $StartHere) -ne $ExpectedStartHereBlob){Write-JobResult 'FAIL' 'START_HERE_FROZEN_BLOB_REPAIR_FAILED';exit 21}
+    $ExtractRoot=Join-Path ([IO.Path]::GetTempPath()) ('TC3_'+$nonce)
+    $ArchivePath=Join-Path ([IO.Path]::GetTempPath()) ('TC3_'+$nonce+'.zip')
+    $Stage=Acquire-CanonicalReadyPackage $ExtractRoot $ArchivePath
+    Assert-CanonicalPackage $Stage
 
     $Phase='RUN_EXISTING_RC3_GATE'
     $Bootstrap=Join-Path $Stage 'tools\release_v080_rc3_bootstrap.ps1'
@@ -251,7 +154,7 @@ try{
     $Phase='READ_BUILD_RESULT'
     $Release=Join-Path $Stage 'RELEASE_OUTPUT_V080_RC3'
     $Build=Join-Path $Release 'BUILD_RESULT.json'
-    if(-not(Test-Path -LiteralPath $Build -PathType Leaf)){Write-JobResult 'FAIL' 'BUILD_RESULT_MISSING' @{builder_exit=$rc};exit 22}
+    if(-not(Test-Path -LiteralPath $Build -PathType Leaf)){Write-JobResult 'FAIL' 'BUILD_RESULT_MISSING' @{builder_exit=$rc;release_pass=$false};exit 22}
     $B=Get-Content -LiteralPath $Build -Raw -Encoding UTF8|ConvertFrom-Json
     Get-SafeBuildSummary $B|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $Out 'BUILD_RESULT_SUMMARY.json') -Encoding UTF8
 
@@ -275,9 +178,9 @@ try{
         builder_exit=$rc
         output_zip=$zipName
         output_zip_sha256=$sha
-        source_package_freeze=[string]$located.Freeze
-        staged_to_current_freeze=$true
-        original_package_modified=$false
+        source_package='canonical-release-ready-download'
+        source_ready_commit=$ExpectedReadyCommit
+        frozen_source_verified_by_builder=$true
         product_gate_verified=$true
         visual_touch_launched=[bool]$visual
         visual_touch_required='confirm-dedicated-uke-and-chatgpt-tabs'
@@ -289,5 +192,6 @@ try{
     Write-JobResult 'FAIL' 'COCKPIT_JOB_EXCEPTION' @{exception_type=$safeType;exception_line=[int]$_.InvocationInfo.ScriptLineNumber;release_pass=$false}
     exit 30
 }finally{
-    try{if($Stage -and (Test-Path -LiteralPath $Stage)){Remove-Item -LiteralPath $Stage -Recurse -Force -ErrorAction SilentlyContinue}}catch{}
+    try{if($ExtractRoot -and (Test-Path -LiteralPath $ExtractRoot)){Remove-Item -LiteralPath $ExtractRoot -Recurse -Force -ErrorAction SilentlyContinue}}catch{}
+    try{if($ArchivePath -and (Test-Path -LiteralPath $ArchivePath)){Remove-Item -LiteralPath $ArchivePath -Force -ErrorAction SilentlyContinue}}catch{}
 }
