@@ -1,6 +1,6 @@
 {
   "schema": "tanuki-windows-factory-controller-queue-v1",
-  "updated_utc": "2026-09-21T00:59:09Z",
+  "updated_utc": "2026-09-21T01:35:00Z",
   "execution_policy": "ONE_AT_A_TIME",
   "active_job_id": "clinic-cockpit-rc3-r2-20260921-001",
   "jobs": [
@@ -8,7 +8,7 @@
       "position": 1,
       "job_id": "clinic-cockpit-rc3-r2-20260921-001",
       "product": "Clinic Cockpit Lite v0.8.0 RC3",
-      "state": "ACTIVE_DISPATCHED_AWAITING_LOCAL_RESULT",
+      "state": "ACTIVE_FACTORY_COMPLETION_CANARY",
       "target_factory_id": "ed813f7bf5ebbd7fabb4819b769ac2182116d41a7c172992dae03d4e4c4cf10f",
       "canonical_issue": "kaz1213-hash/clinic-cockpit-lite#49",
       "target_head": "203a2a3775dc06671de4733ec01cb9d4f503ce87"
@@ -17,7 +17,7 @@
       "position": 2,
       "job_id": "tanuki-comic-gate-a-v08-20260921-queued",
       "product": "Tanuki Comic Gate A / known-good v0.8 recovery",
-      "state": "QUEUED_BLOCKED_BY_ACTIVE_JOB",
+      "state": "BLOCKED_BY_FACTORY_COMPLETION",
       "blocked_by": "clinic-cockpit-rc3-r2-20260921-001",
       "target_factory_id": "ed813f7bf5ebbd7fabb4819b769ac2182116d41a7c172992dae03d4e4c4cf10f",
       "canonical_issue": "kaz1213-hash/tanuki-comic#31",
@@ -35,8 +35,9 @@
       "position": 3,
       "job_id": "fx-university-windows-native-next",
       "product": "FX University Windows/native gate",
-      "state": "QUEUED_AFTER_COMIC",
+      "state": "BLOCKED_BY_FACTORY_COMPLETION_AND_COMIC",
       "blocked_by": "tanuki-comic-gate-a-v08-20260921-queued"
     }
-  ]
+  ],
+  "project_wide_gate": "WINDOWS_FACTORY_COMPLETION_REQUIRED"
 }
