@@ -1,0 +1,14 @@
+{
+  "schema": "tanuki-windows-runner-job-v1",
+  "job_id": "clinic-cockpit-rc3-final-001",
+  "entrypoint": "RunClinicCockpit.ps1",
+  "timeout_minutes": 120,
+  "include_console_tail": false,
+  "safe_result_files": [
+    "COCKPIT_JOB_RESULT.json",
+    "BUILD_RESULT_SUMMARY.json"
+  ],
+  "required_result_files": [
+    "COCKPIT_JOB_RESULT.json"
+  ]
+}
