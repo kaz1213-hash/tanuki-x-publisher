@@ -143,7 +143,8 @@ try{
     if(-not $Original){Write-JobResult 'HOLD' 'RC3_PACKAGE_NOT_FOUND';exit 20}
 
     $Phase='STAGE_PACKAGE'
-    $Stage=Join-Path ([IO.Path]::GetTempPath()) ('TanukiCockpitR2_'+[Guid]::NewGuid().ToString('N'))
+    $nonce=[Guid]::NewGuid().ToString('N').Substring(0,8)
+    $Stage=Join-Path ([IO.Path]::GetTempPath()) ('TC3_'+$nonce)
     Copy-PackageToStage $Original $Stage
     Assert-StagedPackage $Stage
 
