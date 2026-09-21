@@ -109,7 +109,7 @@ try {
     exit 0
 }
 catch {
-    if(-not $summary.error_code){ $summary.error_code = [string]$_.Exception.Message }
+    if(-not $summary.error_code){ $summary.error_code = 'SELFTEST_VERIFIER_EXCEPTION' }
     try { Save-Final } catch {}
     try {
         if(Test-Path -LiteralPath $FinalZip){ Remove-Item -LiteralPath $FinalZip -Force }
