@@ -1,6 +1,6 @@
 {
   "schema": "tanuki-windows-factory-controller-status-v1",
-  "updated_utc": "2026-09-21T00:59:09Z",
+  "updated_utc": "2026-09-21T00:00:00Z",
   "factory": {
     "name": "spectre-win11",
     "id": "ed813f7bf5ebbd7fabb4819b769ac2182116d41a7c172992dae03d4e4c4cf10f",
@@ -12,18 +12,21 @@
   },
   "controller_view": {
     "machine_live_heartbeat_available": false,
-    "live_machine_state": "UNKNOWN_FROM_REMOTE",
+    "live_machine_state": "WATCHER_NOT_EVIDENCED_AFTER_INSTALL",
     "last_confirmed_machine_evidence": "INSTALL/SELFTEST/PAIRING PASS on 2026-09-20/21",
     "active_job": "clinic-cockpit-rc3-r2-20260921-001",
-    "active_job_state": "DISPATCHED_AWAITING_LOCAL_OUTBOX_RESULT",
+    "active_job_state": "DISPATCHED_BUT_NO_OUTBOX_RESULT_AFTER_MULTIPLE_POLL_INTERVALS",
     "next_job": "tanuki-comic-gate-a-v08-20260921-queued",
     "queue_depth": 3,
     "outbound_result_return_connected": false,
-    "note": "This file is controller-side visibility only. It must not be interpreted as a live Spectre heartbeat."
+    "note": "This file is controller-side visibility only. It must not be interpreted as a live Spectre heartbeat.",
+    "likely_root_cause": "Factory is configured AUTO_START=AT_LOGON; if install/pairing occurred in the current logon session and installer did not start watcher immediately, watcher may not have started yet.",
+    "next_physical_action": "ONE Windows restart or sign-out/sign-in to trigger the registered AT_LOGON watcher. Then allow up to 2 minutes for first poll/result creation."
   },
   "desired_v11_visibility": {
     "state": "PLANNED",
     "requirement": "Spectre itself should expose a persistent visible status showing watcher alive, last poll, active job, last result, and next queued job.",
-    "preferred_surface": "small always-available local status window or tray indicator; no Director debugging steps"
+    "preferred_surface": "small always-available local status window or tray indicator; no Director debugging steps",
+    "install_behavior": "Installer must start watcher immediately after successful install, in addition to registering AT_LOGON auto-start."
   }
 }
