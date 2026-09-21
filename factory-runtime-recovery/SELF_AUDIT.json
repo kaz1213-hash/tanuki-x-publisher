@@ -1,0 +1,23 @@
+{
+  "schema": "factory-one-shot-self-audit-v1",
+  "base_pr_head": "52287b52f68a86cc27db801008a7c5a284f122c7",
+  "qualification_environment": "Microsoft PowerShell 7.4.19 on Linux",
+  "native_parser": "PASS",
+  "runtime_assertions": 24,
+  "policy_assertions": 21,
+  "delivery_assertions": 4,
+  "ps51_syntax_and_commands_profile": "PASS",
+  "ps51_type_profile": "EXPLICIT_ASSEMBLY_LOADS_REQUIRE_ON_DEVICE_PREFLIGHT",
+  "windows_generic_execution": "NOT_RUN",
+  "spectre_execution": "NOT_RUN",
+  "native_before_mutation": ["Windows.Preflight.ps1", "Runtime.Smoke.ps1", "RecoveryPolicy.Smoke.ps1"],
+  "repair_condition": "MACHINE_CONFIRMED_HMAC_32_ARGUMENT_PRESPAWN_ONLY",
+  "director_launch_count": 1,
+  "return_mode": "C_MANUAL_SINGLE_ZIP",
+  "automatic_return_pass": false,
+  "reboot_forced": false,
+  "reboot_regression": "PENDING_NEXT_NATURAL_LOGON",
+  "comic_fx_dispatch": "BLOCKED",
+  "factory_completion_pass": false,
+  "product_release_pass": false
+}

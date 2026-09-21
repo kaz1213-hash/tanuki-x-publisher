@@ -1,7 +1,10 @@
-Set-StrictMode -Version 2.0
+﻿Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 $script:FactoryRoot='C:\TanukiFactory'
 $script:Attempt=$null
+$script:LastPollUtc=$null
+$script:BuildSummary=$null
+$script:EmergencyRoot=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'TanukiFactoryRecovery\emergency'
 function Write-FactoryJson($Path,$Value) {
     $parent=Split-Path -Parent $Path
     New-Item -ItemType Directory -Path $parent -Force | Out-Null
@@ -15,22 +18,32 @@ function Set-FactoryPhase([string]$Phase) {
     $script:Attempt.phase=$Phase
     $script:Attempt.updated_utc=[DateTime]::UtcNow.ToString('o')
     Write-FactoryJson (Join-Path $script:FactoryRoot 'STATE\active-attempt.json') $script:Attempt
+    $eventDir=Join-Path $script:FactoryRoot 'STATE\phase-events'
+    New-Item -ItemType Directory -Path $eventDir -Force|Out-Null
+    @{attempt_id=$script:Attempt.attempt_id;phase=$Phase;utc=$script:Attempt.updated_utc}|ConvertTo-Json -Compress|Add-Content -LiteralPath (Join-Path $eventDir ($script:Attempt.attempt_id+'.jsonl')) -Encoding UTF8
+    Write-FactoryHeartbeat 'RUNNING'
 }
 function Start-FactoryAttempt([string]$JobId) {
     if($JobId -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$'){throw 'Invalid job ID.'}
-    $script:Attempt=[ordered]@{schema='tanuki-factory-attempt-v2';job_id=$JobId;attempt_id=[Guid]::NewGuid().ToString('N');phase='accepted';previous_phase=$null;status='RUNNING';started_utc=[DateTime]::UtcNow.ToString('o');updated_utc=[DateTime]::UtcNow.ToString('o');child_pid=$null;exit_code=$null;error_code=$null;product_gate='UNVERIFIED';return_state='LOCAL_ONLY';factory_completion_pass=$false}
+    $script:Attempt=[ordered]@{schema='tanuki-factory-attempt-v2';job_id=$JobId;attempt_id=[Guid]::NewGuid().ToString('N');phase='accepted';previous_phase=$null;status='RUNNING';started_utc=[DateTime]::UtcNow.ToString('o');updated_utc=[DateTime]::UtcNow.ToString('o');child_pid=$null;exit_code=$null;error_code=$null;product_gate='UNVERIFIED';return_state='MANUAL_ZIP_PENDING';retry_eligibility='NOT_TERMINAL';target_r2_head='203a2a3775dc06671de4733ec01cb9d4f503ce87';factory_completion_pass=$false}
     Set-FactoryPhase 'accepted'
 }
 function Complete-FactoryAttempt([string]$Status,[string]$Code) {
     if($Status -notin @('PASS','FAIL','HOLD')){throw 'Invalid terminal state.'}
     # Persist terminal JSON BEFORE any log, notification or compression operation.
     $script:Attempt.status=$Status
+    $script:Attempt.retry_eligibility=Get-FactoryRetryEligibility $script:Attempt
     $script:Attempt.error_code=$Code
     $script:Attempt.updated_utc=[DateTime]::UtcNow.ToString('o')
     $dir=Join-Path $script:FactoryRoot ('OUTBOX\'+$script:Attempt.job_id+'\'+$script:Attempt.attempt_id)
     $path=Join-Path $dir 'FACTORY_RESULT.json'
-    Write-FactoryJson $path $script:Attempt
-    Write-FactoryJson (Join-Path $script:FactoryRoot 'STATE\active-attempt.json') $script:Attempt
+    try {Write-FactoryJson $path $script:Attempt} catch {
+        $script:Attempt.status='HOLD';$script:Attempt.error_code='PRIMARY_RESULT_STORAGE_FAILED'
+        $dir=Join-Path $script:EmergencyRoot $script:Attempt.attempt_id
+        $path=Join-Path $dir 'FACTORY_RESULT.json'
+        Write-FactoryJson $path $script:Attempt
+    }
+    try {Write-FactoryJson (Join-Path $script:FactoryRoot 'STATE\active-attempt.json') $script:Attempt} catch {}
     try {
         # Only the allowlisted scalar record is returned. No logs/source/medical files.
         $zip=Join-Path (Split-Path $dir -Parent) ($script:Attempt.attempt_id+'_RESULT.zip')
@@ -39,8 +52,9 @@ function Complete-FactoryAttempt([string]$Status,[string]$Code) {
         $script:Attempt.error_code='RESULT_BUNDLE_FAILED'
         $script:Attempt.status='HOLD'
         Write-FactoryJson $path $script:Attempt
-        Write-FactoryJson (Join-Path $script:FactoryRoot 'STATE\active-attempt.json') $script:Attempt
+        try {Write-FactoryJson (Join-Path $script:FactoryRoot 'STATE\active-attempt.json') $script:Attempt} catch {}
     }
+    try {Write-FactoryHeartbeat $script:Attempt.status} catch {}
     return $script:Attempt.status
 }
 function Expand-FactorySafeZip([string]$Zip,[string]$Destination) {
@@ -66,7 +80,7 @@ function Test-FactoryCockpitResult([string]$Source,[DateTime]$Started) {
             if($r.schema -ne 'clinic-cockpit-no-github-windows-release-gate-v1'){continue}
             if($r.candidate -ne 'v0.8.0 RC3' -or $r.frozen_commit -ne '70ec03be3de89548bf61ceea2661bffb03dab18a'){continue}
             if($path.LastWriteTimeUtc -lt $Started){continue}
-            if($r.status -ne 'PASS' -or $r.windows_candidate_pass -ne $true){continue}
+            if($r.status -ne 'PASS' -or $r.windows_candidate_pass -isnot [bool] -or $r.windows_candidate_pass -ne $true){continue}
             $required=@('frozen-source-verification','integrated-source-completion-gate','windows-runtime-product-gate','portable-renamed-exe-runtime-gate','final-zip-extracted-runtime-gate','portable-privacy-scan')
             foreach($name in $required){
                 $matches=@($r.steps | Where-Object {$_.name -eq $name})
@@ -77,6 +91,8 @@ function Test-FactoryCockpitResult([string]$Source,[DateTime]$Started) {
             if(-not (Test-Path -LiteralPath $zip -PathType Leaf)){continue}
             if((Get-TanukiSha256Hex $zip) -ne [string]$r.output_zip_sha256){continue}
             $valid+=,$r
+            $script:BuildSummary=[ordered]@{candidate='v0.8.0 RC3';frozen_commit='70ec03be3de89548bf61ceea2661bffb03dab18a';target_r2_head='203a2a3775dc06671de4733ec01cb9d4f503ce87';status='PASS';final_zip_sha256=[string]$r.output_zip_sha256;gate_names=$required;release_pass=$false}
+            Write-FactoryJson (Join-Path $script:FactoryRoot 'STATE\cockpit-build-summary.json') $script:BuildSummary
         } catch {continue}
     }
     return ($valid.Count -eq 1)
@@ -119,7 +135,10 @@ function Invoke-TanukiJobPackage([string]$JobZip,[string]$JobId) {
     $handle=$proc.Handle
     $script:Attempt.child_pid=$proc.Id
     Set-FactoryPhase 'job-running'
-    if(-not $proc.WaitForExit($minutes*60000)){
+    $deadline=[DateTime]::UtcNow.AddMinutes($minutes)
+    while(-not $proc.WaitForExit(2000)){
+        Write-FactoryHeartbeat 'RUNNING'
+        if([DateTime]::UtcNow -le $deadline){continue}
         # Do not kill an unverified PID tree or advance the queue after timeout.
         $script:Attempt.error_code='CHILD_TIMEOUT_STILL_POSSIBLY_RUNNING'
         throw 'Child timeout; queue remains blocked.'
@@ -136,4 +155,10 @@ function Invoke-TanukiJobPackage([string]$JobZip,[string]$JobId) {
     }
     # Other product gates are not yet integrated and must not inherit exit-code PASS.
     return 'HOLD'
+}
+
+function Write-FactoryHeartbeat([string]$State) {
+    $job=$null;$phase='idle'
+    if($script:Attempt){$job=$script:Attempt.job_id;$phase=$script:Attempt.phase}
+    Write-FactoryJson (Join-Path $script:FactoryRoot 'STATE\watcher-heartbeat.json') @{schema='factory-liveness-v2';pid=$PID;utc=[DateTime]::UtcNow.ToString('o');last_poll_utc=$script:LastPollUtc;state=$State;job_id=$job;phase=$phase;next_job='Tanuki Comic Gate A — BLOCKED';remote_return_connected=$false}
 }

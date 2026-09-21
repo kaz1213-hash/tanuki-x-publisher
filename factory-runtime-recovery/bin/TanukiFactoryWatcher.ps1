@@ -1,7 +1,8 @@
-Set-StrictMode -Version 2.0
+﻿Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 . 'C:\TanukiFactory\bin\TanukiFactoryCommon.ps1'
 . 'C:\TanukiFactory\bin\FactoryRuntime.ps1'
+. 'C:\TanukiFactory\bin\RecoveryPolicy.ps1'
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
 $state=Join-Path $script:FactoryRoot 'STATE'
 New-Item -ItemType Directory -Path $state -Force | Out-Null
@@ -9,7 +10,7 @@ try {$lock=[IO.File]::Open((Join-Path $state 'watcher.lock'),'OpenOrCreate','Rea
 try {
     while($true){
         try {
-            Write-FactoryJson (Join-Path $state 'watcher-heartbeat.json') @{schema='factory-liveness-v2';pid=$PID;utc=[DateTime]::UtcNow.ToString('o');state='POLLING';remote_return_connected=$false}
+            Write-FactoryHeartbeat 'POLLING'
             # Previous terminal or interrupted attempt blocks automatic repeats/queue advancement.
             $active=Join-Path $state 'active-attempt.json'
             if(Test-Path -LiteralPath $active){
@@ -19,11 +20,16 @@ try {
                     foreach($prop in $prior.PSObject.Properties){$script:Attempt[$prop.Name]=$prop.Value}
                     [void](Complete-FactoryAttempt 'HOLD' 'PREVIOUS_ATTEMPT_INTERRUPTED_RECONCILIATION_REQUIRED')
                 }
+                $script:Attempt=[ordered]@{}
+                foreach($prop in $prior.PSObject.Properties){$script:Attempt[$prop.Name]=$prop.Value}
+                if($script:Attempt.status -eq 'RUNNING'){$script:Attempt.status='HOLD'}
+                Write-FactoryHeartbeat $script:Attempt.status
                 Start-Sleep -Seconds 30
                 continue
             }
             $config=Get-TanukiFactoryConfig
             if(-not [bool]$config.allow_remote_jobs){Start-Sleep -Seconds 30;continue}
+            $script:LastPollUtc=[DateTime]::UtcNow.ToString('o')
             $feed=Invoke-RestMethod -UseBasicParsing -Uri ([string]$config.feed_url) -TimeoutSec 20
             if($feed.schema -ne 'tanuki-windows-factory-feed-v1'){throw 'Invalid feed.'}
             foreach($item in @($feed.jobs)){
@@ -34,7 +40,12 @@ try {
                 $processed=Join-Path $state 'processed.json'
                 if(Test-Path -LiteralPath $processed){
                     $old=Get-Content -LiteralPath $processed -Raw -Encoding UTF8 | ConvertFrom-Json
-                    if($old.PSObject.Properties[[string]$item.job_id]){continue}
+                    $legacy=$old.PSObject.Properties[[string]$item.job_id]
+                    if($legacy){
+                        Start-FactoryAttempt ([string]$item.job_id)
+                        [void](Complete-FactoryAttempt 'HOLD' 'LEGACY_RESULT_REQUIRES_RECONCILIATION')
+                        break
+                    }
                 }
                 Start-FactoryAttempt ([string]$item.job_id)
                 try {

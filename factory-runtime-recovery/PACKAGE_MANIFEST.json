@@ -1,0 +1,66 @@
+{
+  "schema": "factory-recovery-package-v1",
+  "base_pr_head": "52287b52f68a86cc27db801008a7c5a284f122c7",
+  "files": [
+    {
+      "path": "ApplyVerifiedRecovery.ps1",
+      "sha256": "7a757411784585fd66b01976dc172b7d599aff90a18157b2c88d14ca360c2923"
+    },
+    {
+      "path": "COMPATIBILITY_AUDIT.md",
+      "sha256": "b5c9e2374425eb3430c3f14e7dc998da91ee4e96a44c297208412f13c78d239d"
+    },
+    {
+      "path": "CollectFactoryEvidence.ps1",
+      "sha256": "df0ce6afe05b942d7709cae1e7ad40bc23d47f814e168952e53f9c44ce201141"
+    },
+    {
+      "path": "README.md",
+      "sha256": "a8a47b875af5e735ebb942a9f7e7cbc3d31bdeb4ccceca06142724d5ee8faf43"
+    },
+    {
+      "path": "RunRecovery.ps1",
+      "sha256": "8cda0f217b5f29e42e16c3b339af4d1cec1067e420e93b14cb56e23edf685461"
+    },
+    {
+      "path": "SELF_AUDIT.json",
+      "sha256": "79ecf6661a971d85eaf8968baad742d28f782dac74dfc1d2aeddf51bc6915820"
+    },
+    {
+      "path": "bin/FactoryRuntime.ps1",
+      "sha256": "e89a5715179d64dfff50217e253131048a7521f89361b68489baf1eac7891014"
+    },
+    {
+      "path": "bin/FactoryStatus.ps1",
+      "sha256": "b3a38cd67708e7e9c02a070f7fc246146e1e68c373480b1c8a089c61210aac2b"
+    },
+    {
+      "path": "bin/RecoveryPolicy.ps1",
+      "sha256": "ed593fa514452fd9094a986f51d1f160e706b232ef4e1b7a6ec32c670befe468"
+    },
+    {
+      "path": "bin/TanukiFactoryCommon.ps1",
+      "sha256": "b034fcdeca76173262d7038b91609c495e2737c6f3b49f53e06fc93cbfe2dc64"
+    },
+    {
+      "path": "bin/TanukiFactoryWatcher.ps1",
+      "sha256": "9728c94777b6b6788fac7090aa98b5595ae98dd26232f2db948367e53a52abfb"
+    },
+    {
+      "path": "tests/RecoveryPolicy.Smoke.ps1",
+      "sha256": "72269961dfdbc35a7b1d4b8d440c5a4ab105827f891502a9a425010a06ce2292"
+    },
+    {
+      "path": "tests/ResultDelivery.Smoke.ps1",
+      "sha256": "c9248d5d8e9a240682f1e197d27e8905339c54bdbb589f51d6b50fe722a96cef"
+    },
+    {
+      "path": "tests/Runtime.Smoke.ps1",
+      "sha256": "5dcc0812e3ae8170034d4417a1c531c6627ab89d9354ee99529a871a812dca99"
+    },
+    {
+      "path": "tests/Windows.Preflight.ps1",
+      "sha256": "99894d4d528d29479669d5187c3f0952890108e0b1cb06d93cf9e93975cf0f19"
+    }
+  ]
+}
