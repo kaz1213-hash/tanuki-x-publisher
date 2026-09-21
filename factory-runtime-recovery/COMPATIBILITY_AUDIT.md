@@ -36,3 +36,7 @@ Existing Netlify projects were reread; no enabled Forms receiver is available. N
 ## Packaging
 
 Single self-contained START_FACTORY_RECOVERY.cmd, ASCII/CRLF. Embedded ZIP is SHA256 checked before extraction. Files are expanded into a unique persistent LocalAppData directory. Paths are passed via environment variables/quoted arguments, not interpolated into source. PS1 files are UTF8 BOM/CRLF. No GitHub/Python download is required for recovery. Cockpit's own pre-existing build dependency requirements are unchanged.
+
+## Follow-up qualification boundary
+
+See INSTALLER_AUDIT_20260921.md. HMAC failure is now machine-confirmed in the returned Spectre receipt. Current installer hardening adds 3 failure and 41 transaction assertions on Linux PS7. A new Windows.Qualification.ps1 tests the actual native scheduled-task APIs on an AI-owned Windows guest; it has not been run. No current generic Windows PASS or Director distribution is authorized by these Linux tests.

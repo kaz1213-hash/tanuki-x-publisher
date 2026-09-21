@@ -12,6 +12,11 @@ $label=New-Object Windows.Forms.Label
 $label.Dock='Fill';$label.Padding=New-Object Windows.Forms.Padding(20)
 $label.Font=New-Object Drawing.Font('Yu Gothic UI',11)
 $form.Controls.Add($label)
+$openResult=New-Object Windows.Forms.Button
+$openResult.Text='返却する結果ファイルを表示';$openResult.Dock='Bottom';$openResult.Height=42;$openResult.Enabled=$false
+$script:readyResult=''
+$openResult.add_Click({if($script:readyResult -and (Test-Path -LiteralPath $script:readyResult)){Start-Process -FilePath 'explorer.exe' -ArgumentList ('/select,"'+$script:readyResult+'"')|Out-Null}})
+$form.Controls.Add($openResult)
 $tray=New-Object Windows.Forms.NotifyIcon
 $tray.Icon=[Drawing.SystemIcons]::Information;$tray.Text='Tanuki Factory';$tray.Visible=$true
 $tray.add_DoubleClick({$form.Show();$form.WindowState='Normal'})
@@ -38,7 +43,15 @@ $timer.add_Tick({
         if($resultPath -and (Test-Path -LiteralPath $resultPath)){
             $r=Get-Content -LiteralPath $resultPath -Raw -Encoding UTF8|ConvertFrom-Json
             if($r.status -in @('PASS','FAIL','HOLD','RUNNING')){$state=[string]$r.status}
-            if($state -ne 'RUNNING'){$returnText='処理結果を保存しました。返却用のRESULT.zipを1個アップロードしてください。'}
+            if($r.PSObject.Properties['phase']){$phase=[string]$r.phase}
+            $installPath=Join-Path (Split-Path -Parent $resultPath) 'FACTORY_RECOVERY_INSTALL_RESULT.json'
+            if(Test-Path -LiteralPath $installPath){$install=Get-Content -LiteralPath $installPath -Raw -Encoding UTF8|ConvertFrom-Json;$phase=[string]$install.phase}
+            if($state -ne 'RUNNING'){
+                $zip=Join-Path (Split-Path -Parent $resultPath) 'RESULT.zip'
+                $script:readyResult=if(Test-Path -LiteralPath $zip){$zip}else{$resultPath}
+                $openResult.Enabled=Test-Path -LiteralPath $script:readyResult
+                $returnText=if(Test-Path -LiteralPath $zip){'結果ZIPを保存しました。下のボタンで返却するファイルを表示できます。'}else{'結果JSONは保存済みです。ZIP生成は未完了です。下のボタンで確認できます。'}
+            }
         }
         $label.Text="監視プロセス: $alive`r`n最終poll: $lastPoll`r`n現在: $job`r`n段階: $phase`r`n判定: $state`r`n次: Tanuki Comic Gate A（保留）`r`n`r`n$returnText`r`n`r`nFactory完成判定は実機証拠の確認後です。"
         $transition=$state
