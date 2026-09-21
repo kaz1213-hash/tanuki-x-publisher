@@ -175,14 +175,7 @@ catch {
     $result.status='FAIL'
     if($result.code -eq 'NOT_RUN'){
         $message=[string]$_.Exception.Message
-        if($message -match '^[A-Z0-9_]+
-finally {
-    try { Write-Result } catch {}
-}
-
-if($result.status -eq 'PASS'){ exit 0 }
-exit 1
-){
+        if($message -match '^[A-Z0-9_]+$'){
             $result.code=$message
         } else {
             $result.code='PREFLIGHT_REJECTED'
