@@ -1,3 +1,5 @@
+> Historical audit. Current distribution policy and self-qualification boundary are in SHADOW_QUALIFICATION_CONTRACT.md. The Director has authorized Spectre shadow qualification before mutation in one launch. Prior BLOCKED distribution statements below describe the earlier revision.
+
 # Spectre one-shot compatibility and acceptance audit
 
 Base PR #2 head reread: 52287b52f68a86cc27db801008a7c5a284f122c7 (draft/open).

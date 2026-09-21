@@ -4,6 +4,7 @@ Set-StrictMode -Version 2.0
 . (Join-Path $PSScriptRoot '..\bin\FactoryRuntime.ps1')
 . (Join-Path $PSScriptRoot '..\bin\RecoveryPolicy.ps1')
 $script:FactoryRoot=Join-Path ([IO.Path]::GetTempPath()) ('factory-test-'+[Guid]::NewGuid().ToString('N'))
+$script:EmergencyRoot=Join-Path $script:FactoryRoot 'emergency'
 New-Item -ItemType Directory -Path $script:FactoryRoot -Force | Out-Null
 $script:Passed=0
 function Assert($Condition,[string]$Message){if(-not $Condition){throw $Message};$script:Passed++}

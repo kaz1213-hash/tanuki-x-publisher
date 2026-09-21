@@ -25,7 +25,11 @@ try {
     try {
         $dir=Join-Path ([Environment]::GetFolderPath('Desktop')) 'TanukiFactory_Result'
         New-Item -ItemType Directory -Path $dir -Force|Out-Null
-        [IO.File]::WriteAllText((Join-Path $dir 'FACTORY_RESULT.json'),$result,[Text.Encoding]::UTF8)
+        $receipt=Join-Path $dir 'FACTORY_RESULT.json'
+        [IO.File]::WriteAllText($receipt,$result,[Text.Encoding]::UTF8)
+        $returnFile=$receipt
+        try{Compress-Archive -LiteralPath $receipt -DestinationPath (Join-Path $dir 'RESULT.zip') -Force;$returnFile=Join-Path $dir 'RESULT.zip'}catch{}
+        Start-Process explorer.exe -ArgumentList ('/select,"'+$returnFile+'"')|Out-Null
     } catch {
         try{[IO.File]::WriteAllText((Join-Path ([IO.Path]::GetTempPath()) 'TANUKI_FACTORY_BOOTSTRAP_RESULT.json'),$result)}catch{}
     }

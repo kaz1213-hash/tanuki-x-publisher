@@ -1,9 +1,9 @@
-﻿param([string]$OutputDirectory)
+﻿param([string]$OutputDirectory,[string]$QualificationReceipt,[string]$QualificationNonce)
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 $root='C:\TanukiFactory'
 $job='clinic-cockpit-rc3-r2-20260921-001'
-$report=[ordered]@{schema='factory-recovery-install-v2';status='HOLD';code='STARTING';installed=$false;keys_read=$false;restart_performed=$false;runtime_verified=$false;started_utc=[DateTime]::UtcNow.ToString('o');backup_complete=$false;rollback='NOT_NEEDED';phase='INITIALIZING';exception_class='NONE';exception_line=0;phase_state='START';events=@();backup_files_copied=0;processed_backup_complete=$false;receipt_storage='PRIMARY';restart_attempted=$false;transaction_state='NONE'}
+$report=[ordered]@{schema='factory-recovery-install-v2';status='HOLD';code='STARTING';installed=$false;keys_read=$false;restart_performed=$false;runtime_verified=$false;started_utc=[DateTime]::UtcNow.ToString('o');backup_complete=$false;rollback='NOT_NEEDED';phase='INITIALIZING';exception_class='NONE';exception_line=0;phase_state='START';events=@();backup_files_copied=0;processed_backup_complete=$false;receipt_storage='PRIMARY';restart_attempted=$false;transaction_state='NONE';start_observation=[ordered]@{complete=$false;task_state='UNVERIFIED';active_attempt_exists=$false;work_process_count=0}}
 $stopped=$false;$replaced=$false;$backup=$null;$lock=$null;$backedUp=@();$newFiles=@()
 $receiptId=[Guid]::NewGuid().ToString('N')
 function Save-InstallReceipt {
@@ -39,6 +39,10 @@ try {
     . (Join-Path $PSScriptRoot 'bin\RecoveryPolicy.ps1')
     . (Join-Path $PSScriptRoot 'bin\FactoryRuntime.ps1')
     Set-InstallPhase 'HELPER_LOAD' 'COMPLETE'
+    Set-InstallPhase 'SHADOW_QUALIFICATION_GATE'
+    . (Join-Path $PSScriptRoot 'bin\QualificationPolicy.ps1')
+    $qualification=Assert-FactoryQualification $QualificationReceipt $QualificationNonce (Join-Path $PSScriptRoot 'PACKAGE_MANIFEST.json')
+    Set-InstallPhase 'SHADOW_QUALIFICATION_GATE' 'COMPLETE'
     Set-InstallPhase 'DIAGNOSTIC'
     # No mutation until the existing machine's diagnostic is eligible.
     $evidence=& (Join-Path $PSScriptRoot 'CollectFactoryEvidence.ps1') -OutputDirectory $OutputDirectory
@@ -103,7 +107,7 @@ try {
     Set-InstallPhase 'BACKUP_WATCHERS'
     foreach($f in $files){
         $dest=Join-Path $root ('bin\'+$f.Name)
-        if(Test-Path -LiteralPath $dest){Copy-Item -LiteralPath $dest -Destination (Join-Path $backup $f.Name);if((Get-FileHash -LiteralPath $dest -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath (Join-Path $backup $f.Name) -Algorithm SHA256).Hash){throw 'BACKUP_HASH_MISMATCH'};$backedUp+=$f.Name;$report.backup_files_copied++;Set-InstallPhase 'BACKUP_FILE' 'COMPLETE'}else{$newFiles+=$f.Name}
+        if(Test-Path -LiteralPath $dest){Copy-Item -LiteralPath $dest -Destination (Join-Path $backup $f.Name);if((Get-FileHash -LiteralPath $dest -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath (Join-Path $backup $f.Name) -Algorithm SHA256).Hash){throw 'BACKUP_HASH_MISMATCH'};$backedUp+=$f.Name;$report.backup_files_copied++;$filePhase=switch($f.Name){'TanukiFactoryWatcher.ps1' {'WATCHER_BACKUP'};'TanukiFactoryCommon.ps1' {'COMMON_BACKUP'};default {'HELPER_BACKUP'}};Set-InstallPhase $filePhase 'COMPLETE'}else{$newFiles+=$f.Name}
     }
     Set-InstallPhase 'BACKUP_WATCHERS' 'COMPLETE'
     Set-InstallPhase 'BACKUP_PROCESSED'
@@ -122,6 +126,8 @@ try {
         $dest=Join-Path $root ('bin\'+$f.Name)
         Copy-Item -LiteralPath $f.FullName -Destination ($dest+'.new') -Force
         Move-Item -LiteralPath ($dest+'.new') -Destination $dest -Force
+        $filePhase=switch($f.Name){'TanukiFactoryWatcher.ps1' {'WATCHER_REPLACED'};'TanukiFactoryCommon.ps1' {'COMMON_REPLACED'};default {'HELPER_REPLACED'}}
+        Set-InstallPhase $filePhase 'COMPLETE'
     }
     Set-InstallPhase 'BIN_REPLACEMENT' 'COMPLETE'
     Set-InstallPhase 'RETRY_STATE_UPDATE'
@@ -138,7 +144,14 @@ try {
     $startAttempted=$true;$report.restart_attempted=$true
     Start-ScheduledTask -TaskName 'TanukiWindowsFactory' -ErrorAction Stop
     $stopped=$false
-    $report.restart_performed=$true;$report.code='INSTALLED_AWAITING_RUNTIME'
+    $report.restart_performed=$true
+    $deadline=[DateTime]::UtcNow.AddSeconds(15)
+    while((Get-ScheduledTask -TaskName 'TanukiWindowsFactory').State -ne 'Running'){
+        if([DateTime]::UtcNow -gt $deadline){throw 'START_OUTCOME_REQUIRES_RECONCILIATION'}
+        Start-Sleep -Milliseconds 200
+    }
+    $report.start_observation.task_state='Running'
+    $report.code='INSTALLED_AWAITING_RUNTIME'
     Set-InstallPhase 'WATCHER_RESTART' 'COMPLETE'
 } catch {
     # Fixed class and script line only: never export exception messages or paths.
@@ -157,8 +170,20 @@ try {
     $cause=$cause.InnerException
     }
     $report.exception_line=[int]$_.InvocationInfo.ScriptLineNumber
-    $safe=@('INSTALL_RECEIPT_STORAGE_FAILED','INSTALL_PRIMARY_RECEIPT_UNAVAILABLE','PRIOR_RECOVERY_REQUIRES_RECONCILIATION','BACKUP_HASH_MISMATCH','DIAGNOSTIC_INCOMPLETE','ACTIVE_ATTEMPT_REQUIRES_RECONCILIATION','EXACT_STOP_PHASE_NOT_YET_PROVEN','FAILURE_NOT_IN_VERIFIED_REPAIR_CLASS','CRYPTO_EVIDENCE_INCONSISTENT','EXISTING_EXECUTION_REQUIRES_RECONCILIATION','TASK_USER_DIFFERS','PROCESSED_STATE_INCONSISTENT','FACTORY_ID_MISMATCH','INSTALLED_SOURCE_DIVERGED','FEED_TARGET_MISMATCH','FEED_IDENTITY_MISMATCH','WATCHER_DID_NOT_STOP','STATE_CHANGED_BEFORE_APPLY')
+    $safe=@('SHADOW_QUALIFICATION_REQUIRED','SHADOW_QUALIFICATION_INVALID','SHADOW_QUALIFICATION_NOT_PASS','SHADOW_QUALIFICATION_SOURCE_MISMATCH','SHADOW_QUALIFICATION_STALE','INSTALL_RECEIPT_STORAGE_FAILED','INSTALL_PRIMARY_RECEIPT_UNAVAILABLE','PRIOR_RECOVERY_REQUIRES_RECONCILIATION','BACKUP_HASH_MISMATCH','DIAGNOSTIC_INCOMPLETE','ACTIVE_ATTEMPT_REQUIRES_RECONCILIATION','EXACT_STOP_PHASE_NOT_YET_PROVEN','FAILURE_NOT_IN_VERIFIED_REPAIR_CLASS','CRYPTO_EVIDENCE_INCONSISTENT','EXISTING_EXECUTION_REQUIRES_RECONCILIATION','TASK_USER_DIFFERS','PROCESSED_STATE_INCONSISTENT','FACTORY_ID_MISMATCH','INSTALLED_SOURCE_DIVERGED','FEED_TARGET_MISMATCH','FEED_IDENTITY_MISMATCH','WATCHER_DID_NOT_STOP','STATE_CHANGED_BEFORE_APPLY')
     $report.code=if($_.Exception.Message -in $safe){$_.Exception.Message}else{'RECOVERY_EXCEPTION'}
+    if($startAttempted){
+        try{
+            $state=[string](Get-ScheduledTask -TaskName 'TanukiWindowsFactory' -ErrorAction Stop).State
+            $report.start_observation.task_state=if($state -in @('Running','Ready','Disabled','Queued','Unknown')){$state}else{'OTHER'}
+            $report.start_observation.active_attempt_exists=Test-Path -LiteralPath (Join-Path $root 'STATE\active-attempt.json')
+            $prefix=(Join-Path $root 'WORK')+'\'
+            foreach($process in @(Get-CimInstance Win32_Process -ErrorAction Stop)){
+                if($process.CommandLine -and ([string]$process.CommandLine).IndexOf($prefix,[StringComparison]::OrdinalIgnoreCase) -ge 0){$report.start_observation.work_process_count++}
+            }
+            $report.start_observation.complete=$true
+        }catch{}
+    }
     # Once the lock is released, a watcher may already have spawned a child.
     # Never roll back binaries or retry task start across that uncertain boundary.
     if($replaced -and $null -eq $lock){$report.code='START_OUTCOME_REQUIRES_RECONCILIATION'}

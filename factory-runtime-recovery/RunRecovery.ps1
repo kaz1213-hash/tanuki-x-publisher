@@ -3,7 +3,8 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 $root='C:\TanukiFactory'
 $script:ExportResultsToDesktop=$true
-$script:RunState=[ordered]@{schema='factory-one-shot-result-v1';status='RUNNING';code='PREFLIGHT';started_utc=[DateTime]::UtcNow.ToString('o');finished_utc=$null;repair_applied=$false;windows_ps51_preflight='UNVERIFIED';spectre_runtime='UNVERIFIED';automatic_result_return=$false;return_mode='MANUAL_SINGLE_ZIP';factory_completion_pass=$false;product_release_pass=$false;reboot_observed=$false;watcher_after_reboot='UNVERIFIED';diagnostic=$null;install=$null;attempt=$null;build_summary=$null;phase='INITIALIZING';phase_state='START';phase_events=@();exception_class='NONE';exception_line=0}
+$script:ReadyResultPath=$null
+$script:RunState=[ordered]@{schema='factory-one-shot-result-v1';status='RUNNING';code='PREFLIGHT';started_utc=[DateTime]::UtcNow.ToString('o');finished_utc=$null;repair_applied=$false;windows_ps51_preflight='UNVERIFIED';spectre_runtime='UNVERIFIED';automatic_result_return=$false;return_mode='MANUAL_SINGLE_ZIP';factory_completion_pass=$false;product_release_pass=$false;reboot_observed=$false;watcher_after_reboot='UNVERIFIED';diagnostic=$null;install=$null;attempt=$null;build_summary=$null;phase='INITIALIZING';phase_state='START';phase_events=@();exception_class='NONE';exception_line=0;qualification=$null}
 $script:RunDirectory=$SessionDirectory
 $runLock=$null
 function Save-RunResult([string]$Status,[string]$Code) {
@@ -14,11 +15,13 @@ function Save-RunResult([string]$Status,[string]$Code) {
     if($Status -ne 'RUNNING'){
         $resultZip=Join-Path $script:RunDirectory 'RESULT.zip'
         Remove-Item -LiteralPath $resultZip -Force -ErrorAction SilentlyContinue
-        try {Compress-Archive -LiteralPath $path -DestinationPath $resultZip -Force} catch {
+        $zipReady=$false
+        try {Compress-Archive -LiteralPath $path -DestinationPath $resultZip -Force;$zipReady=$true} catch {
             Remove-Item -LiteralPath $resultZip -Force -ErrorAction SilentlyContinue
             $script:RunState.status='HOLD';$script:RunState.code='RESULT_COMPRESSION_FAILED_JSON_RETAINED'
             $script:RunState|ConvertTo-Json -Depth 14|Set-Content -LiteralPath $path -Encoding UTF8
         }
+        $script:ReadyResultPath=if($zipReady){$resultZip}else{$path}
         # Export only the allowlisted result, never raw logs or product/clinic files.
         try {
             if(-not $script:ExportResultsToDesktop){return}
@@ -27,15 +30,53 @@ function Save-RunResult([string]$Status,[string]$Code) {
             New-Item -ItemType Directory -Path $ready -Force|Out-Null
             $stamp=([DateTime]::Parse($script:RunState.started_utc)).ToString('yyyyMMdd-HHmmss')
             $zip=Join-Path $script:RunDirectory 'RESULT.zip'
-            if(Test-Path -LiteralPath $zip){Copy-Item -LiteralPath $zip -Destination (Join-Path $ready ('FACTORY_RESULT_'+$stamp+'.zip')) -Force}
-            else{Copy-Item -LiteralPath $path -Destination (Join-Path $ready ('FACTORY_RESULT_'+$stamp+'.json')) -Force}
+            if($zipReady){
+                $desktopResult=Join-Path $ready 'RESULT.zip'
+                Copy-Item -LiteralPath $zip -Destination $desktopResult -Force
+                if((Get-FileHash -LiteralPath $zip).Hash -ne (Get-FileHash -LiteralPath $desktopResult).Hash){throw 'Desktop result copy failed'}
+                $script:ReadyResultPath=$desktopResult
+            }
+            else{
+                $desktopResult=Join-Path $ready 'FACTORY_RESULT.json'
+                Copy-Item -LiteralPath $path -Destination $desktopResult -Force
+                $script:ReadyResultPath=$desktopResult
+            }
         } catch {}
+        # Local-only pointer, deliberately excluded from the return ZIP.
+        try{@{path=$script:ReadyResultPath}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $script:RunDirectory 'DELIVERY_LOCATION.json') -Encoding UTF8}catch{}
     }
 }
 function Set-RecoveryPhase([string]$Phase,[string]$State='START'){
     $script:RunState.phase=$Phase;$script:RunState.phase_state=$State
     $script:RunState.phase_events+=@{phase=$Phase;state=$State;utc=[DateTime]::UtcNow.ToString('o')}
     Save-RunResult 'RUNNING' $Phase
+}
+function Invoke-QualifiedFactoryRecovery([string]$PowerShell,[string]$PackageRoot,[string]$RunDirectory,[string]$Nonce){
+    Set-RecoveryPhase 'QUALIFYING'
+    $receipt=Join-Path $RunDirectory 'WINDOWS_QUALIFICATION.json'
+    & $PowerShell -NoProfile -STA -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PackageRoot 'tests\Windows.Qualification.ps1') -OutputDirectory $RunDirectory -Nonce $Nonce *> (Join-Path $RunDirectory 'qualification-local.log')
+    $qualifierExit=$LASTEXITCODE
+    if(Test-Path -LiteralPath $receipt){
+        # The qualifier writes only fixed codes/booleans/hashes; no local paths or messages.
+        $script:RunState.qualification=Get-Content -LiteralPath $receipt -Raw -Encoding UTF8|ConvertFrom-Json
+    }
+    if($qualifierExit -ne 0){throw 'SHADOW_QUALIFICATION_NOT_PASS'}
+    $q=Assert-FactoryQualification $receipt $Nonce (Join-Path $PackageRoot 'PACKAGE_MANIFEST.json')
+    $script:RunState.qualification=$q
+    $script:RunState.windows_ps51_preflight='PASS'
+    Set-RecoveryPhase 'QUALIFYING' 'COMPLETE'
+    # There is intentionally no machine diagnostic/installer call before the gate above.
+    Set-RecoveryPhase 'DIAGNOSING'
+    $evidence=& (Join-Path $PackageRoot 'CollectFactoryEvidence.ps1') -OutputDirectory $RunDirectory
+    $script:RunState.diagnostic=$evidence
+    Set-RecoveryPhase 'DIAGNOSING' 'COMPLETE'
+    if($evidence.repair_decision -ne 'ELIGIBLE_HMAC_PRESPAWN_REPAIR'){throw $evidence.repair_decision}
+    Set-RecoveryPhase 'REPAIRING'
+    $install=& (Join-Path $PackageRoot 'ApplyVerifiedRecovery.ps1') -OutputDirectory $RunDirectory -QualificationReceipt $receipt -QualificationNonce $Nonce
+    $script:RunState.install=$install;$script:RunState.repair_applied=$install.installed
+    if(-not $install.installed -or $install.code -ne 'INSTALLED_AWAITING_RUNTIME'){throw ([string]$install.code)}
+    Set-RecoveryPhase 'REPAIRING' 'COMPLETE'
+    return $install
 }
 function Get-SafeAttempt($a) {
     $safe=[ordered]@{}
@@ -81,36 +122,13 @@ try {
         }
     }
     Set-RecoveryPhase 'PACKAGE_VERIFY' 'COMPLETE'
-    if(-not $Resume){
-        Set-RecoveryPhase 'WINDOWS_PREFLIGHT'
-        & $ps -NoProfile -STA -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'tests\Windows.Preflight.ps1') *> (Join-Path $script:RunDirectory 'windows-preflight-local.log')
-        if($LASTEXITCODE -ne 0){throw 'WINDOWS_SYNTHETIC_RUNTIME_FAILED'}
-        & $ps -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'tests\Runtime.Smoke.ps1') *> (Join-Path $script:RunDirectory 'native-smoke-local.log')
-        if($LASTEXITCODE -ne 0){throw 'WINDOWS_SYNTHETIC_RUNTIME_FAILED'}
-        & $ps -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'tests\RecoveryPolicy.Smoke.ps1') *> (Join-Path $script:RunDirectory 'native-policy-local.log')
-        if($LASTEXITCODE -ne 0){throw 'WINDOWS_SYNTHETIC_RUNTIME_FAILED'}
-        foreach($fixtureTest in @('InstallerFailure.Smoke.ps1','InstallerTransaction.Smoke.ps1','ResultDelivery.Smoke.ps1')){
-            & $ps -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot ('tests\'+$fixtureTest)) *> (Join-Path $script:RunDirectory ($fixtureTest+'.local.log'))
-            if($LASTEXITCODE -ne 0){throw 'WINDOWS_SYNTHETIC_RUNTIME_FAILED'}
-        }
-        $script:RunState.windows_ps51_preflight='PASS'
-        Set-RecoveryPhase 'WINDOWS_PREFLIGHT' 'COMPLETE'
-    }
+    . (Join-Path $PSScriptRoot 'bin\QualificationPolicy.ps1')
     $statusScript=Join-Path $PSScriptRoot 'bin\FactoryStatus.ps1'
     $arguments='-NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File "'+$statusScript+'" -SessionDirectory "'+$script:RunDirectory+'"'
     Start-Process -FilePath $ps -ArgumentList $arguments -WindowStyle Hidden|Out-Null
     if(-not $Resume){
-        Set-RecoveryPhase 'MACHINE_DIAGNOSTIC'
-        $evidence=& (Join-Path $PSScriptRoot 'CollectFactoryEvidence.ps1') -OutputDirectory $script:RunDirectory
-        $script:RunState.diagnostic=$evidence
-        Set-RecoveryPhase 'MACHINE_DIAGNOSTIC' 'COMPLETE'
-        if($evidence.repair_decision -ne 'ELIGIBLE_HMAC_PRESPAWN_REPAIR'){throw $evidence.repair_decision}
-        Set-RecoveryPhase 'INSTALLER'
-        $install=& (Join-Path $PSScriptRoot 'ApplyVerifiedRecovery.ps1') -OutputDirectory $script:RunDirectory
-        $script:RunState.install=$install
-        $script:RunState.repair_applied=$install.installed
-        if(-not $install.installed -or $install.code -ne 'INSTALLED_AWAITING_RUNTIME'){throw ([string]$install.code)}
-        Set-RecoveryPhase 'INSTALLER' 'COMPLETE'
+        $qualificationNonce=[Guid]::NewGuid().ToString('N')
+        $install=Invoke-QualifiedFactoryRecovery $ps $PSScriptRoot $script:RunDirectory $qualificationNonce
         # Persist controller for next natural restart/logon; never force-reboot the user's PC.
         $boot=(Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).LastBootUpTime.ToUniversalTime().ToString('o')
         @{boot_utc=$boot;directory=$script:RunDirectory;started_utc=$script:RunState.started_utc}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $root 'STATE\recovery-session.json') -Encoding UTF8
@@ -124,7 +142,7 @@ try {
         $boot=(Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).LastBootUpTime.ToUniversalTime()
         $script:RunState.reboot_observed=$boot -gt [DateTime]::Parse([string]$session.boot_utc).ToUniversalTime()
     }
-    Set-RecoveryPhase 'CANARY_OBSERVE'
+    Set-RecoveryPhase 'RUNNING_COCKPIT'
     $deadline=[DateTime]::UtcNow.AddMinutes(135)
     $pickupDeadline=[DateTime]::UtcNow.AddMinutes(3)
     $activePath=Join-Path $root 'STATE\active-attempt.json'
@@ -159,7 +177,7 @@ try {
 } catch {
     $script:RunState.exception_line=[int]$_.InvocationInfo.ScriptLineNumber
     $script:RunState.exception_class=if($_.Exception -is [IO.IOException]){'IO_ERROR'}elseif($_.Exception -is [UnauthorizedAccessException]){'ACCESS_DENIED'}else{'OTHER'}
-    $codes=@('INSTALL_RECEIPT_STORAGE_FAILED','INSTALL_PRIMARY_RECEIPT_UNAVAILABLE','PRIOR_RECOVERY_REQUIRES_RECONCILIATION','BACKUP_HASH_MISMATCH','START_OUTCOME_REQUIRES_RECONCILIATION','LOCK_RELEASE_FAILED','WINDOWS_PS51_X64_REQUIRED','PACKAGE_PATH_INVALID','PACKAGE_HASH_MISMATCH','WINDOWS_PARSER_REJECTED','WINDOWS_SYNTHETIC_RUNTIME_FAILED','DIAGNOSTIC_INCOMPLETE','ACTIVE_ATTEMPT_REQUIRES_RECONCILIATION','EXACT_STOP_PHASE_NOT_YET_PROVEN','FAILURE_NOT_IN_VERIFIED_REPAIR_CLASS','CRYPTO_EVIDENCE_INCONSISTENT','EXISTING_EXECUTION_REQUIRES_RECONCILIATION','TASK_USER_DIFFERS','PROCESSED_STATE_INCONSISTENT','FACTORY_ID_MISMATCH','INSTALLED_SOURCE_DIVERGED','FEED_TARGET_MISMATCH','FEED_IDENTITY_MISMATCH','WATCHER_DID_NOT_STOP','STATE_CHANGED_BEFORE_APPLY','RECOVERY_EXCEPTION','ROLLBACK_FAILED','TASK_RESTART_FAILED','NO_NEW_ATTEMPT_AFTER_RESTART','UNEXPECTED_ACTIVE_JOB','BUILD_SUMMARY_INVALID','OBSERVATION_TIMEOUT_QUEUE_BLOCKED','WATCHER_HEARTBEAT_STALE')
+    $codes=@('SHADOW_QUALIFICATION_REQUIRED','SHADOW_QUALIFICATION_INVALID','SHADOW_QUALIFICATION_NOT_PASS','SHADOW_QUALIFICATION_SOURCE_MISMATCH','SHADOW_QUALIFICATION_STALE','INSTALL_RECEIPT_STORAGE_FAILED','INSTALL_PRIMARY_RECEIPT_UNAVAILABLE','PRIOR_RECOVERY_REQUIRES_RECONCILIATION','BACKUP_HASH_MISMATCH','START_OUTCOME_REQUIRES_RECONCILIATION','LOCK_RELEASE_FAILED','WINDOWS_PS51_X64_REQUIRED','PACKAGE_PATH_INVALID','PACKAGE_HASH_MISMATCH','WINDOWS_PARSER_REJECTED','WINDOWS_SYNTHETIC_RUNTIME_FAILED','DIAGNOSTIC_INCOMPLETE','ACTIVE_ATTEMPT_REQUIRES_RECONCILIATION','EXACT_STOP_PHASE_NOT_YET_PROVEN','FAILURE_NOT_IN_VERIFIED_REPAIR_CLASS','CRYPTO_EVIDENCE_INCONSISTENT','EXISTING_EXECUTION_REQUIRES_RECONCILIATION','TASK_USER_DIFFERS','PROCESSED_STATE_INCONSISTENT','FACTORY_ID_MISMATCH','INSTALLED_SOURCE_DIVERGED','FEED_TARGET_MISMATCH','FEED_IDENTITY_MISMATCH','WATCHER_DID_NOT_STOP','STATE_CHANGED_BEFORE_APPLY','RECOVERY_EXCEPTION','ROLLBACK_FAILED','TASK_RESTART_FAILED','NO_NEW_ATTEMPT_AFTER_RESTART','UNEXPECTED_ACTIVE_JOB','BUILD_SUMMARY_INVALID','OBSERVATION_TIMEOUT_QUEUE_BLOCKED','WATCHER_HEARTBEAT_STALE')
     $code=if($_.Exception.Message -in $codes){$_.Exception.Message}else{'ONE_SHOT_EXCEPTION'}
     if($script:RunDirectory){try{Save-RunResult 'HOLD' $code}catch{
         # Last-resort result beside the extracted package, never raw exception text.
@@ -171,7 +189,8 @@ try {
     if($runLock){try{$runLock.ReleaseMutex();$runLock.Dispose()}catch{}}
     if($script:RunState.status -ne 'RUNNING'){
         try{
-            $returned=Join-Path $script:RunDirectory 'RESULT.zip'
+            $returned=$script:ReadyResultPath
+            if(-not $returned){$returned=Join-Path $script:RunDirectory 'RESULT.zip'}
             if(-not (Test-Path -LiteralPath $returned)){$returned=Join-Path $script:RunDirectory 'FACTORY_RESULT.json'}
             if(Test-Path -LiteralPath $returned){Start-Process -FilePath 'explorer.exe' -ArgumentList ('/select,"'+$returned+'"')|Out-Null}
         }catch{}

@@ -1,5 +1,6 @@
 ﻿Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'Qualification.Fixture.ps1')
 $base=Join-Path ([IO.Path]::GetTempPath()) ('復旧 fixture '+[Guid]::NewGuid().ToString('N'))
 $assertions=0
 function Assert($Condition,$Message){if(-not $Condition){throw $Message};$script:assertions++}
@@ -44,6 +45,10 @@ try {
         [IO.File]::WriteAllText((Join-Path $root 'bin/TanukiFactoryWatcher.ps1'),'LEGACY_WATCHER')
         [IO.File]::WriteAllText((Join-Path $root 'bin/TanukiFactoryCommon.ps1'),'LEGACY_COMMON')
         $job='clinic-cockpit-rc3-r2-20260921-001'
+        $legacyDir=Join-Path $root ('OUTBOX/'+$job);[void][IO.Directory]::CreateDirectory($legacyDir)
+        @{schema='tanuki-windows-factory-result-v1';job_id=$job;status='FAIL';detail='HMACSHA256 argument count 32 overload fixture'}|ConvertTo-Json|Set-Content (Join-Path $legacyDir 'FACTORY_RESULT.json') -Encoding UTF8
+        $remote=Join-Path $root ('WORK/remote_'+$job);[void][IO.Directory]::CreateDirectory($remote)
+        [IO.File]::WriteAllBytes((Join-Path $remote 'payload.bin'),[byte[]](1,2,3,4))
         $processed=Join-Path $root 'STATE/processed.json'
         @{ $job='FAIL'; unrelated='PASS'}|ConvertTo-Json|Set-Content $processed -Encoding UTF8
         $originalProcessed=[IO.File]::ReadAllBytes($processed)
@@ -57,8 +62,9 @@ $decision=if($ctx.case -eq 'STATE_CHANGED' -and $ctx.stops -gt 0){'ACTIVE_ATTEMP
         $source=$source.Replace("`$root='C:\TanukiFactory'",("`$root='"+$root.Replace("'","''")+"'"))
         $source=$source.Replace("[Environment]::GetFolderPath('LocalApplicationData')", ("'"+(Join-Path $fixture 'Fallback').Replace("'","''")+"'"))
         $installer=Join-Path $package 'ApplyVerifiedRecovery.ps1';$source|Set-Content $installer -Encoding UTF8
+        $qualificationArgs=New-QualificationFixtureReceipt $package
         if($case -eq 'RECEIPT_FAIL'){[IO.File]::WriteAllText($out,'not a directory')}
-        $r=& $installer -OutputDirectory $out
+        $r=& $installer -OutputDirectory $out @qualificationArgs
         Assert ($r.status -eq 'HOLD') 'Installer may not assert product PASS'
         Assert (($r|ConvertTo-Json -Depth 16) -notmatch 'PRIVATE_SENTINEL') 'Raw exception exported'
         if($case -eq 'RECEIPT_FAIL'){
@@ -78,7 +84,7 @@ $decision=if($ctx.case -eq 'STATE_CHANGED' -and $ctx.stops -gt 0){'ACTIVE_ATTEMP
             }else{
                 Assert ($r.code -eq 'INSTALLED_AWAITING_RUNTIME') 'Successful transaction not completed'
                 $ctx.starts=0;$ctx.stops=0
-                $again=& $installer -OutputDirectory (Join-Path $fixture 'Repeat')
+                $again=& $installer -OutputDirectory (Join-Path $fixture 'Repeat') @qualificationArgs
                 Assert ($again.code -eq 'PRIOR_RECOVERY_REQUIRES_RECONCILIATION' -and $ctx.stops -eq 0) 'Repeat overwrote existing transaction'
             }
         }else{

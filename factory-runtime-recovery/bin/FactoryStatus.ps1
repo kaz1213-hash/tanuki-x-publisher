@@ -3,10 +3,12 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-$mutex=New-Object Threading.Mutex($false,'Local\TanukiFactoryStatusV2')
+$sha=[Security.Cryptography.SHA256]::Create()
+try{$sessionHash=([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($SessionDirectory)))).Replace('-','')}finally{$sha.Dispose()}
+$mutex=New-Object Threading.Mutex($false,('Local\TanukiFactoryStatusV3_'+$sessionHash))
 if(-not $mutex.WaitOne(0)){exit 0}
 $form=New-Object Windows.Forms.Form
-$form.Text='Tanuki Spectre Factory';$form.Width=650;$form.Height=400
+$form.Text='Tanuki Spectre Factory — Self Qualification';$form.Width=650;$form.Height=400
 $form.StartPosition='CenterScreen'
 $label=New-Object Windows.Forms.Label
 $label.Dock='Fill';$label.Padding=New-Object Windows.Forms.Padding(20)
@@ -44,11 +46,17 @@ $timer.add_Tick({
             $r=Get-Content -LiteralPath $resultPath -Raw -Encoding UTF8|ConvertFrom-Json
             if($r.status -in @('PASS','FAIL','HOLD','RUNNING')){$state=[string]$r.status}
             if($r.PSObject.Properties['phase']){$phase=[string]$r.phase}
+            $phase=switch($phase){'QUALIFYING' {'QUALIFYING（変更前の隔離試験）'};'DIAGNOSING' {'DIAGNOSING（現在状態の確認）'};'REPAIRING' {'REPAIRING（修復中）'};'RUNNING_COCKPIT' {'RUNNING COCKPIT'};default {$phase}}
             $installPath=Join-Path (Split-Path -Parent $resultPath) 'FACTORY_RECOVERY_INSTALL_RESULT.json'
-            if(Test-Path -LiteralPath $installPath){$install=Get-Content -LiteralPath $installPath -Raw -Encoding UTF8|ConvertFrom-Json;$phase=[string]$install.phase}
+            if(Test-Path -LiteralPath $installPath){
+                $install=Get-Content -LiteralPath $installPath -Raw -Encoding UTF8|ConvertFrom-Json
+                if($r.phase -eq 'REPAIRING'){$phase=if($install.phase -eq 'WATCHER_RESTART'){'RESTARTING FACTORY'}else{'REPAIRING'}}
+            }
             if($state -ne 'RUNNING'){
                 $zip=Join-Path (Split-Path -Parent $resultPath) 'RESULT.zip'
                 $script:readyResult=if(Test-Path -LiteralPath $zip){$zip}else{$resultPath}
+                $delivery=Join-Path (Split-Path -Parent $resultPath) 'DELIVERY_LOCATION.json'
+                if(Test-Path -LiteralPath $delivery){$location=Get-Content -LiteralPath $delivery -Raw -Encoding UTF8|ConvertFrom-Json;if(Test-Path -LiteralPath ([string]$location.path)){$script:readyResult=[string]$location.path}}
                 $openResult.Enabled=Test-Path -LiteralPath $script:readyResult
                 $returnText=if(Test-Path -LiteralPath $zip){'結果ZIPを保存しました。下のボタンで返却するファイルを表示できます。'}else{'結果JSONは保存済みです。ZIP生成は未完了です。下のボタンで確認できます。'}
             }

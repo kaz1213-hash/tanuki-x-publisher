@@ -16,6 +16,15 @@ try{[void]$form.Handle}finally{$form.Dispose()}
 $dir=Join-Path ([IO.Path]::GetTempPath()) ('Tanuki 事前確認 '+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $dir|Out-Null
 try {
+    [IO.File]::WriteAllBytes((Join-Path $dir 'synthetic.dpapi'),$protected)
+    $lockPath=Join-Path $dir 'exclusive.lock'
+    $lock=[IO.File]::Open($lockPath,'OpenOrCreate','ReadWrite','None')
+    try{
+        $second=$null;$rejected=$false
+        try{$second=[IO.File]::Open($lockPath,'OpenOrCreate','ReadWrite','None')}catch{$rejected=$true}
+        if($second){$second.Dispose()}
+        if(-not $rejected){throw 'Exclusive lock allowed second owner'}
+    }finally{$lock.Dispose()}
     $script=Join-Path $dir '日本語 試験.ps1'
     [IO.File]::WriteAllText($script,'exit 7',[Text.Encoding]::ASCII)
     $exe=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'

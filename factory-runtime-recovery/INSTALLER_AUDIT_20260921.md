@@ -1,3 +1,5 @@
+> Historical audit. Current distribution policy and self-qualification boundary are in SHADOW_QUALIFICATION_CONTRACT.md. The Director has authorized Spectre shadow qualification before mutation in one launch. Prior BLOCKED distribution statements below describe the earlier revision.
+
 # Installer follow-up audit — release blocked
 
 Canonical PR #2 head reread: a09d8f55430c3a2e34386f3c190327c96c729d99, open/draft. Cockpit R2 remains 203a2a3775dc06671de4733ec01cb9d4f503ce87. Prior Spectre HMAC evidence is accepted, not re-investigated.

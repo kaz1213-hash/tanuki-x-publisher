@@ -2,7 +2,7 @@
 import argparse, base64, hashlib, io, json, pathlib, textwrap, zipfile
 root=pathlib.Path(__file__).resolve().parent
 parser=argparse.ArgumentParser()
-parser.add_argument('--output-directory',type=pathlib.Path,required=True,help='Internal build location; distribution requires matching Windows qualification')
+parser.add_argument('--output-directory',type=pathlib.Path,required=True,help='Build output; launcher enforces on-device shadow qualification before mutation')
 args=parser.parse_args()
 out=args.output_directory
 out.mkdir(exist_ok=True)
@@ -10,7 +10,7 @@ for p in root.rglob('*.ps1'):
     s=p.read_text(encoding='utf-8-sig')
     p.write_bytes(b'\xef\xbb\xbf'+s.replace('\r\n','\n').replace('\n','\r\n').encode('utf-8'))
 paths=sorted(p for p in root.rglob('*') if p.is_file() and p.suffix in {'.ps1','.md','.json'} and p.name not in {'PACKAGE_MANIFEST.json','Bootstrap.template.ps1'} and '__pycache__' not in p.parts)
-manifest={'schema':'factory-recovery-package-v1','base_pr_head':'a09d8f55430c3a2e34386f3c190327c96c729d99','files':[{'path':p.relative_to(root).as_posix(),'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in paths]}
+manifest={'schema':'factory-recovery-package-v1','base_pr_head':'1a159029462cbd793311a17bd65bcc4aad5bf20a','files':[{'path':p.relative_to(root).as_posix(),'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in paths]}
 (root/'PACKAGE_MANIFEST.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
 paths.append(root/'PACKAGE_MANIFEST.json')
 buf=io.BytesIO()
@@ -26,6 +26,6 @@ lines=['@echo off','setlocal DisableDelayedExpansion','set "TANUKI_RECOVERY_SOUR
 assert max(map(len,lines))<8191,'CMD line too long'
 cmd='\r\n'.join(lines)+'\r\n';cmd.encode('ascii')
 final=out/'START_FACTORY_RECOVERY.cmd';final.write_bytes(cmd.encode('ascii'))
-info={'distribution_status':'BLOCKED_PENDING_WINDOWS_QUALIFICATION','file':str(final),'sha256':hashlib.sha256(final.read_bytes()).hexdigest(),'embedded_zip_sha256':sha,'size':final.stat().st_size,'max_line':max(map(len,lines)),'payload_files':len(paths)}
+info={'distribution_status':'READY_FOR_GUARDED_SPECTRE_SELF_QUALIFICATION','file':str(final),'sha256':hashlib.sha256(final.read_bytes()).hexdigest(),'embedded_zip_sha256':sha,'size':final.stat().st_size,'max_line':max(map(len,lines)),'payload_files':len(paths)}
 (out/'PACKAGE_BUILD.json').write_text(json.dumps(info,indent=2)+'\n')
 print(json.dumps(info))

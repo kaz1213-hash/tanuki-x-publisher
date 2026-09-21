@@ -1,34 +1,38 @@
 {
   "schema": "factory-recovery-package-v1",
-  "base_pr_head": "a09d8f55430c3a2e34386f3c190327c96c729d99",
+  "base_pr_head": "1a159029462cbd793311a17bd65bcc4aad5bf20a",
   "files": [
     {
       "path": "ApplyVerifiedRecovery.ps1",
-      "sha256": "25cb512c8fb3eacca78620f6d9f4ab1977b8db61f284211ff986deb22ca19005"
+      "sha256": "2ce415e0ed32866aec146de16651f2326c20cc0cf6ab6b470c582d03c6d2aadf"
     },
     {
       "path": "COMPATIBILITY_AUDIT.md",
-      "sha256": "bd1636d7e74060da4c011ba75afbd91db485f37955150cc65b0e9047e4eac9e5"
+      "sha256": "12b1e42fd9aa976eb628eec83b5ac43d37b1ace00aa40d8b04e355feeee147d6"
     },
     {
       "path": "CollectFactoryEvidence.ps1",
-      "sha256": "df0ce6afe05b942d7709cae1e7ad40bc23d47f814e168952e53f9c44ce201141"
+      "sha256": "72d0418a27e335d4a1f55315d3461ca7919067c2d38cd5afa457b48f716ce211"
     },
     {
       "path": "INSTALLER_AUDIT_20260921.md",
-      "sha256": "b3257b2a6f3e2c036fed6efcceffe456652e9458084c3b85cd2a2a669a4c6b0c"
+      "sha256": "95e8c51dd5da25b6c2e4e74ace68d3e7aa0dc95c31a369f42eee1ce949ed8c8e"
     },
     {
       "path": "README.md",
-      "sha256": "c0383f76eb85c0fb83f9ddfb3c48e81a610754ab1f029e52083678bb8bb24ed8"
+      "sha256": "d389585782d3dd8258ae490f6392844604809b200f9b8083a75747d607a9679e"
     },
     {
       "path": "RunRecovery.ps1",
-      "sha256": "847d39f2ad6c769a49e8b4402a48bbe28546eff1bcddef7adb8e1fa644dfe8c7"
+      "sha256": "42a8dddca1bd9815dff143554ca63cbb558931e45186c2df62da3e7539e957cf"
     },
     {
       "path": "SELF_AUDIT.json",
-      "sha256": "8763899de3390365f6b7fa6f7a5a02cbf433884e8bf59f43d9f715daf85311a3"
+      "sha256": "6b84f5992560528606ebd0e0ed387f82f1c7e89dca231e7ef42e7cd537a8d2b6"
+    },
+    {
+      "path": "SHADOW_QUALIFICATION_CONTRACT.md",
+      "sha256": "62faf61a9e8c8542e855ddbd8688af72515bb93221592f38c7b2dd46122a4209"
     },
     {
       "path": "SPECTRE_EVIDENCE_20260921.md",
@@ -40,7 +44,11 @@
     },
     {
       "path": "bin/FactoryStatus.ps1",
-      "sha256": "dbaa4a11a76205354f4f5a610bda8333255f1aae7f3febb44eecefc0c5326623"
+      "sha256": "922134d2a2a4c3465920f77019d68596f024d22b91b3f28f00e613029cab9b7d"
+    },
+    {
+      "path": "bin/QualificationPolicy.ps1",
+      "sha256": "a3d76401d3dee454e5bf25d88101b9f7350ad3691722bfcac7190f8692e1b9ff"
     },
     {
       "path": "bin/RecoveryPolicy.ps1",
@@ -55,12 +63,24 @@
       "sha256": "9728c94777b6b6788fac7090aa98b5595ae98dd26232f2db948367e53a52abfb"
     },
     {
+      "path": "tests/DeliveryPath.Smoke.ps1",
+      "sha256": "590d77f797a123e24a9e47b6fa46e236914f653252cf472f052f7128d85f6b71"
+    },
+    {
       "path": "tests/InstallerFailure.Smoke.ps1",
-      "sha256": "1b20350460a7def48a8890ca6306c431bcd33786420bf4641ca4673aa5fb7a20"
+      "sha256": "ffeec8264bbf6a45977f3bea3c905e5d7eae18f32fafafb80cb684e98bfad22d"
     },
     {
       "path": "tests/InstallerTransaction.Smoke.ps1",
-      "sha256": "03060165c4021eb42dcd1a1f886ff43f664975886faea10f18a8ee2473402647"
+      "sha256": "593fb1de016d3d85b370876fcfcee2f32b41a6171461bbb4e60ab3fc11851932"
+    },
+    {
+      "path": "tests/Qualification.Fixture.ps1",
+      "sha256": "8e6eeab404bb8e4085217e4097c3654cf899659411cef38e9f6fc97629a773b9"
+    },
+    {
+      "path": "tests/QualificationGate.Smoke.ps1",
+      "sha256": "d1b3e1898401cb77ae106411393db61fa363442bb2231a7cdbace09df3b7605c"
     },
     {
       "path": "tests/RecoveryPolicy.Smoke.ps1",
@@ -72,15 +92,15 @@
     },
     {
       "path": "tests/Runtime.Smoke.ps1",
-      "sha256": "5dcc0812e3ae8170034d4417a1c531c6627ab89d9354ee99529a871a812dca99"
+      "sha256": "dc83b3c38c7d8fd756fbd747442dd1d24949f7413ec614aee7071a74165e5f69"
     },
     {
       "path": "tests/Windows.Preflight.ps1",
-      "sha256": "99894d4d528d29479669d5187c3f0952890108e0b1cb06d93cf9e93975cf0f19"
+      "sha256": "e153ffd7bb1ff4579deb0f5233993ce6f3afe4a0b07d3f14f956e86144a44536"
     },
     {
       "path": "tests/Windows.Qualification.ps1",
-      "sha256": "cbfadb2509b2b13169e6eefe3773f30a4fef9a496914066886d3bb2bb3f1edbc"
+      "sha256": "343a4805e7fb64455ebca674c0049c339c6ba8e1bd862fae54fcfa4ac7d99955"
     }
   ]
 }

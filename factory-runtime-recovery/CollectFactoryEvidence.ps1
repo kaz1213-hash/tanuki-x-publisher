@@ -3,7 +3,7 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'bin\RecoveryPolicy.ps1')
 $job='clinic-cockpit-rc3-r2-20260921-001'
-$result=[ordered]@{schema='tanuki-factory-safe-diagnostic-v2';utc=[DateTime]::UtcNow.ToString('o');job_id=$job;status='HOLD';phase='UNKNOWN_AFTER_PAYLOAD_REQUEST';keys_collected=$false;medical_data_collected=$false;outbound_return_connected=$false;facts=[ordered]@{cipher_exists=$false;cipher_sha=$null;cipher_sha_matches=$false;plaintext_exists=$false;plaintext_sha=$null;plaintext_sha_matches=$false;source_exists=$false;job_manifest_exists=$false;processed_state='ABSENT';terminal_exists=$false;terminal_status='ABSENT';terminal_error_code='NONE';task_state='UNKNOWN';task_last_result=$null;task_user_matches_current_user=$false;watcher_process_count=0;work_process_count=0;process_start_logged=$false;process_end_logged=$false;remote_failure_logged=$false;result_zip_exists=$false;active_attempt_exists=$false;active_phase='NONE';active_status='NONE'};error_codes=@();repair_decision='UNCLASSIFIED'}
+$result=[ordered]@{schema='tanuki-factory-safe-diagnostic-v2';utc=[DateTime]::UtcNow.ToString('o');job_id=$job;status='HOLD';phase='UNKNOWN_AFTER_PAYLOAD_REQUEST';keys_collected=$false;medical_data_collected=$false;outbound_return_connected=$false;facts=[ordered]@{factory_id_matches=$false;watcher_sha=$null;common_sha=$null;installed_source_matches=$false;transaction_exists=$false;transaction_state='NONE';previous_backup_count=0;cipher_exists=$false;cipher_sha=$null;cipher_sha_matches=$false;plaintext_exists=$false;plaintext_sha=$null;plaintext_sha_matches=$false;source_exists=$false;job_manifest_exists=$false;processed_state='ABSENT';terminal_exists=$false;terminal_status='ABSENT';terminal_error_code='NONE';task_state='UNKNOWN';task_last_result=$null;task_user_matches_current_user=$false;watcher_process_count=0;work_process_count=0;process_start_logged=$false;process_end_logged=$false;remote_failure_logged=$false;result_zip_exists=$false;active_attempt_exists=$false;active_phase='NONE';active_status='NONE'};error_codes=@();repair_decision='UNCLASSIFIED'}
 if(-not $OutputDirectory){$OutputDirectory=Join-Path $Root ('OUTBOX\RECOVERY\'+[Guid]::NewGuid().ToString('N'))}
 function Read-SmallJson([string]$Path){
     $f=Get-Item -LiteralPath $Path -ErrorAction Stop
@@ -12,6 +12,15 @@ function Read-SmallJson([string]$Path){
 }
 try {
     $f=$result.facts
+    $config=Read-SmallJson (Join-Path $Root 'config.json')
+    $f.factory_id_matches=$config.factory_id -eq 'ed813f7bf5ebbd7fabb4819b769ac2182116d41a7c172992dae03d4e4c4cf10f'
+    $f.watcher_sha=(Get-FileHash -LiteralPath (Join-Path $Root 'bin\TanukiFactoryWatcher.ps1') -Algorithm SHA256).Hash.ToLowerInvariant()
+    $f.common_sha=(Get-FileHash -LiteralPath (Join-Path $Root 'bin\TanukiFactoryCommon.ps1') -Algorithm SHA256).Hash.ToLowerInvariant()
+    $f.installed_source_matches=$f.watcher_sha -eq '7efb360445ed41a9b9ca353e0c5fb37be988bb947975641cb01f6eeeaf4ef63a' -and $f.common_sha -eq '50ebb4ebcaf3c719b528f7fd1723e22b074c072ab4de57b9197195c35f79510a'
+    $transaction=Join-Path $Root 'STATE\recovery-transaction.json'
+    $f.transaction_exists=Test-Path -LiteralPath $transaction
+    if($f.transaction_exists){$t=Read-SmallJson $transaction;$f.transaction_state=if($t.state -in @('PREPARING','REPLACING','COMMITTED','ROLLED_BACK')){[string]$t.state}else{'UNKNOWN'}}
+    $f.previous_backup_count=@(Get-ChildItem -LiteralPath (Join-Path $Root 'STATE') -Filter 'recovery-backup-*' -Directory -ErrorAction Stop).Count
     $remote=Join-Path $Root ('WORK\remote_'+$job)
     $cipher=Join-Path $remote 'payload.bin';$plain=Join-Path $remote ($job+'.job.zip')
     $f.cipher_exists=Test-Path -LiteralPath $cipher -PathType Leaf
