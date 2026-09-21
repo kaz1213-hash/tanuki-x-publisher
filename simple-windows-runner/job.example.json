@@ -1,5 +1,6 @@
 {
   "job_id": "example",
   "entrypoint": "run.cmd",
-  "timeout_minutes": 60
+  "timeout_minutes": 60,
+  "include_console_tail": false
 }
