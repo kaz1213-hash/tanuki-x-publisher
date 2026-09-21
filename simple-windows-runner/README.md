@@ -2,7 +2,25 @@
 
 Purpose: run one self-contained Windows job on Spectre, return one privacy-bounded `RESULT.zip`, and keep validated product artifacts separate under `ARTIFACTS/<run-id>/`.
 
-This reset lane intentionally does **not** implement a queue, remote feed, encrypted/HMAC/DPAPI transport, scheduled task, retry/reboot persistence, GitHub Actions, PAT/OAuth, or a background service. First prove a small Windows execution contract end-to-end.
+This reset lane intentionally does **not** implement a queue, remote feed, encrypted/HMAC/DPAPI transport, scheduled task, retry/reboot persistence, GitHub Actions, PAT/OAuth, or a background service.
+
+## Runtime status
+
+Generic runner v0.5 is **Spectre runtime-qualified**.
+
+Real Windows self-test evidence:
+- result schema: `tanuki-windows-runner-result-v3`
+- runner version: `0.5`
+- manifest schema: `tanuki-windows-runner-job-v1`
+- child status: PASS
+- exit code: 0
+- safe result collected exactly: `SELFTEST_RESULT.json`
+- required result missing: none
+- artifact count: 1
+- unlisted probe absent from `RESULT.zip`
+- child self-test checks: all PASS
+
+The returned diagnostic ZIP contained only `RESULT.json` and `output/SELFTEST_RESULT.json`, proving the allowlist boundary while the separately written artifact was counted outside the diagnostic package.
 
 ## Generic runner contract
 
@@ -44,27 +62,20 @@ The self-test is product-independent. It verifies the generic environment/output
 - the artifact exists outside the diagnostic ZIP;
 - the child self-test checks are all true.
 
-The one-click lane then creates `FACTORY_SELFTEST_RESULT.zip`. That is the only evidence package needed for Factory qualification.
+## Running a real job
 
-This is the preferred Factory canary now that Clinic Cockpit RC3 has been completed through another product-specific route.
+Place a `JOB/` directory beside `RunJob.ps1` using the manifest contract above, then use `RUN_JOB.cmd`.
 
-## Clinic Cockpit canary
-
-`START_COCKPIT_WINDOWS.cmd` and `JOB/` remain as a historical/product canary. They are no longer the definition of the generic Factory architecture.
-
-The Cockpit job still returns only:
-- `BUILD_RESULT_SUMMARY.json`
-- `COCKPIT_JOB_RESULT.json`
-
-The generic runner does not interpret Clinic Cockpit release semantics. Product-specific acceptance stays inside the child job.
+The generic runner owns process isolation, timeout, safe result collection, evidence packaging, and artifact separation. Product-specific build/runtime acceptance stays inside the child job.
 
 ## Current Factory boundary
 
-Build next only after the minimal runner itself has a real Windows PASS:
-- no queue;
-- no watcher/service;
-- no encrypted feed/HMAC/DPAPI;
-- no automatic outbound upload;
-- no Director log reading or PowerShell debugging.
+The minimal runner is now runtime-qualified. The next development stage may add reusable job-package conventions and additional product canaries, but still does **not** justify reintroducing:
+- encrypted remote feed;
+- HMAC/DPAPI transport;
+- queue;
+- scheduled watcher/service;
+- retry/reboot persistence;
+- automatic outbound upload.
 
-The next Factory milestone is a real Spectre PASS of the standalone runner self-test, with `FACTORY_SELFTEST_RESULT.zip` proving the allowlist contract and artifact separation.
+Those remain separate future decisions, not prerequisites for using the runner.
