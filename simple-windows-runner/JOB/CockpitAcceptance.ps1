@@ -3,7 +3,7 @@
     if($ExitCode -ne 0){throw 'BUILDER_EXIT_NONZERO'}
     if((Get-SafeProperty $Build 'schema' '') -ne 'clinic-cockpit-no-github-windows-release-gate-v1'){throw 'BUILD_SCHEMA_MISMATCH'}
     if((Get-SafeProperty $Build 'candidate' '') -ne 'v0.8.0 RC3'){throw 'BUILD_CANDIDATE_MISMATCH'}
-    if((Get-SafeProperty $Build 'frozen_commit' '') -ne '70ec03be3de89548bf61ceea2661bffb03dab18a'){throw 'BUILD_FROZEN_MISMATCH'}
+    if((Get-SafeProperty $Build 'frozen_commit' '') -ne '33fffccf66ab66f4bf161af8f07797576a6379b7'){throw 'BUILD_FROZEN_MISMATCH'}
     $pass=Get-SafeProperty $Build 'windows_candidate_pass' $false
     if((Get-SafeProperty $Build 'status' '') -ne 'PASS' -or $pass -isnot [bool] -or -not $pass){throw 'WINDOWS_CANDIDATE_NOT_PASS'}
     foreach($name in $required){
