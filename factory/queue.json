@@ -1,6 +1,6 @@
 {
   "schema": "tanuki-windows-factory-controller-queue-v1",
-  "updated_utc": "2026-09-21T04:29:54.958Z",
+  "updated_utc": "2026-09-21T06:50:23Z",
   "execution_policy": "ONE_AT_A_TIME",
   "active_job_id": "clinic-cockpit-rc3-r2-20260921-001",
   "jobs": [
@@ -15,28 +15,14 @@
     },
     {
       "position": 2,
-      "job_id": "tanuki-comic-gate-a-v08-20260921-queued",
-      "product": "Tanuki Comic Gate A / known-good v0.8 recovery",
-      "state": "BLOCKED_BY_COCKPIT_RUNTIME_RESULT",
-      "blocked_by": "clinic-cockpit-rc3-r2-20260921-001",
-      "target_factory_id": "ed813f7bf5ebbd7fabb4819b769ac2182116d41a7c172992dae03d4e4c4cf10f",
-      "canonical_issue": "kaz1213-hash/tanuki-comic#31",
-      "recovery_branch": "recovery/v09-from-known-good-v08",
-      "recovery_head": "1d928cb9e1c73e160a7e5ccfb53856e1c8b03b8a",
-      "baseline_commit": "cd170861f8318af9795db4f8dd5f52472d0acc91",
-      "source_artifact_sha256": "3f32c97f523fa41c58175a9fada0cc9a1c3fd92f837677081aaf51bde79f781b",
-      "source_artifact_size_bytes": 17933463,
-      "source_exe_sha256": "67ca1fdb3e097ace77e4ea61352ddef49ed42ef0b052aa85dfb952b248684164",
-      "gate": "ordinary Windows + headed ordinary Google Chrome full v0.8 buyer flow",
-      "dispatch_ready": false,
-      "dispatch_blocker": "Factory Completion Gate and Cockpit runtime result must be proven; a generic terminal FAIL does not authorize automatic advancement."
-    },
-    {
-      "position": 3,
       "job_id": "fx-university-windows-native-next",
-      "product": "FX University Windows/native gate",
-      "state": "BLOCKED_BY_FACTORY_COMPLETION_AND_COMIC",
-      "blocked_by": "tanuki-comic-gate-a-v08-20260921-queued"
+      "product": "FX University Shadow Windows/native gate",
+      "state": "BLOCKED_BY_FACTORY_COMPLETION_AND_EXACT_HEAD_ARTIFACT",
+      "blocked_by": "clinic-cockpit-rc3-r2-20260921-001",
+      "canonical_pr": "kaz1213-hash/fx-university#2",
+      "target_head": "43c8cbaf0439d34e52607e46423bc00d6bae97e8",
+      "dispatch_ready": false,
+      "dispatch_blocker": "Factory Completion Gate remains open and the FX single owner has not yet materialized the exact-head standalone Director artifact. Obsolete Tanuki Comic #31 recovery is superseded by Comic #35 and no longer blocks FX."
     }
   ],
   "project_wide_gate": "HOLD_FACTORY_NOT_COMPLETE"
