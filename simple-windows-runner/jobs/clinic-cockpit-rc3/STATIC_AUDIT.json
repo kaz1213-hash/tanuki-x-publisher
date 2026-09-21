@@ -1,5 +1,5 @@
 {
-  "schema": "tanuki-cockpit-factory-canary-static-audit-v1",
+  "schema": "tanuki-cockpit-factory-canary-static-audit-v2",
   "status": "PASS",
   "runner": {
     "version": "0.5",
@@ -12,13 +12,22 @@
     "candidate": "v0.8.0 RC3",
     "corrected_frozen_commit": "bf640bc9a58c3810b2d8cadde46b142054a18f3f",
     "corrected_frozen_tree": "4dcd25855460d7b15ce14261e9eae79aceab54f8",
-    "previous_windows_evidence_freeze": "33fffccf66ab66f4bf161af8f07797576a6379b7",
+    "release_ready_branch": "release-ready/v0.8.0-rc3-no-github-r2",
     "release_ready_head": "7bd55eb7010fe20f233506cea0ac11a6a48c9449",
-    "product_runtime_source_changed_by_latest_fix": false,
-    "delta_from_previous_evidence_freeze": [
-      "RELEASE_CANDIDATE.json",
-      "tests/test_windows_launcher_runtime.py"
-    ]
+    "product_runtime_source_changed_by_latest_fix": false
+  },
+  "canonical_source_acquisition": {
+    "mode": "pinned-public-github-archive",
+    "repository": "kaz1213-hash/clinic-cockpit-lite",
+    "commit": "7bd55eb7010fe20f233506cea0ac11a6a48c9449",
+    "requires_existing_spectre_package": false,
+    "requires_git": false,
+    "requires_github_login": false,
+    "requires_pat": false,
+    "embedded_patch_payload": false,
+    "archive_bytes_trusted_without_content_checks": false,
+    "archive_content_identity_checked_before_execution": true,
+    "full_frozen_source_verification_owned_by_hardened_builder": true
   },
   "exact_blob_contract": {
     "corrected_release_manifest": "4caeec00f80e3315f1e3421a90b3b2b1d2add9c7",
@@ -27,8 +36,10 @@
     "corrected_rc3_bootstrap": "50dd8176ab2183c0f5daa82971964ef0a3ac86f1",
     "hardened_base_builder": "866bf993f83a6add72f2593b579ba7f408eb8536",
     "frozen_start_here": "5be7c5c73d20122bdd3226d2f65d2275c066a1bd",
-    "embedded_release_manifest_blob_matches_source_of_truth": true,
-    "embedded_launcher_test_blob_matches_source_of_truth": true
+    "release_ready_manifest_blob_verified_from_canonical_repo": true,
+    "release_ready_launcher_test_blob_verified_from_canonical_repo": true,
+    "release_ready_adapter_blob_verified_from_canonical_repo": true,
+    "release_ready_bootstrap_blob_verified_from_canonical_repo": true
   },
   "job_contract": {
     "schema": "tanuki-windows-runner-job-v1",
@@ -41,13 +52,7 @@
       "COCKPIT_JOB_RESULT.json"
     ],
     "short_temp_staging": true,
-    "original_rc3_package_modified": false,
-    "accepted_source_package_freezes": [
-      "33fffccf66ab66f4bf161af8f07797576a6379b7",
-      "bf640bc9a58c3810b2d8cadde46b142054a18f3f"
-    ],
-    "fail_closed_unknown_source_blob": true,
-    "full_frozen_source_verification_owned_by_hardened_builder": true,
+    "fail_closed_unknown_canonical_blob": true,
     "final_artifact_separate_from_result_zip": true,
     "final_zip_sha_reverified_before_delivery": true,
     "exact_final_zip_auto_extracted_for_visual_touch": true,
