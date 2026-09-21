@@ -1,6 +1,13 @@
 {
+  "schema": "tanuki-windows-runner-job-v1",
   "job_id": "example",
   "entrypoint": "run.cmd",
   "timeout_minutes": 60,
-  "include_console_tail": false
+  "include_console_tail": false,
+  "safe_result_files": [
+    "SAFE_RESULT.json"
+  ],
+  "required_result_files": [
+    "SAFE_RESULT.json"
+  ]
 }
