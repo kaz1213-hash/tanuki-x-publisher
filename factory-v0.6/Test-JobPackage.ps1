@@ -102,6 +102,7 @@ try {
     $result.risk_class=$risk
     Add-Check 'risk-class' 'PASS'
 
+    if($null -eq $pkg.PSObject.Properties['director_operations_required']){ throw 'DIRECTOR_OPERATIONS_MISSING' }
     if([int]$pkg.director_operations_required -ne 0){ throw 'DIRECTOR_OPERATIONS_NOT_ZERO' }
     Add-Check 'director-operations-zero' 'PASS'
 
@@ -172,7 +173,21 @@ try {
 }
 catch {
     $result.status='FAIL'
-    if($result.code -eq 'NOT_RUN'){ $result.code='PREFLIGHT_REJECTED' }
+    if($result.code -eq 'NOT_RUN'){
+        $message=[string]$_.Exception.Message
+        if($message -match '^[A-Z0-9_]+
+finally {
+    try { Write-Result } catch {}
+}
+
+if($result.status -eq 'PASS'){ exit 0 }
+exit 1
+){
+            $result.code=$message
+        } else {
+            $result.code='PREFLIGHT_REJECTED'
+        }
+    }
 }
 finally {
     try { Write-Result } catch {}
