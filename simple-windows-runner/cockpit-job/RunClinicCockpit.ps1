@@ -45,12 +45,20 @@ function Write-JobResult([string]$Status,[string]$Code,[hashtable]$Extra=@{}){
 
 function Git-BlobSha1([string]$Path){
     $raw=[IO.File]::ReadAllBytes($Path)
-    $header=[Text.Encoding]::UTF8.GetBytes(('blob '+$raw.Length+"\0"))
+    $prefix=[Text.Encoding]::UTF8.GetBytes(('blob '+$raw.Length))
+    $header=New-Object byte[] ($prefix.Length+1)
+    [Array]::Copy($prefix,0,$header,0,$prefix.Length)
+    $header[$header.Length-1]=0
     $all=New-Object byte[] ($header.Length+$raw.Length)
     [Array]::Copy($header,0,$all,0,$header.Length)
     [Array]::Copy($raw,0,$all,$header.Length,$raw.Length)
     $sha=[Security.Cryptography.SHA1]::Create()
     try{return (($sha.ComputeHash($all)|ForEach-Object{$_.ToString('x2')}) -join '')}finally{$sha.Dispose()}
+}
+
+function Write-ExactStartHere([string]$Path){
+    $text="@echo off`ncd /d %~dp0`npy -m pip install -r requirements.txt`npy -m streamlit run app.py`npause`n"
+    [IO.File]::WriteAllBytes($Path,[Text.Encoding]::ASCII.GetBytes($text))
 }
 
 function CandidateRoots {
@@ -142,8 +150,7 @@ try{
 
     $Phase='RESTORE_FROZEN_START_HERE'
     $StartHere=Join-Path $Stage 'START_HERE_WINDOWS.bat'
-    $ExactText="@echo off\ncd /d %~dp0\npy -m pip install -r requirements.txt\npy -m streamlit run app.py\npause\n"
-    [IO.File]::WriteAllBytes($StartHere,[Text.Encoding]::ASCII.GetBytes($ExactText))
+    Write-ExactStartHere $StartHere
     if((Git-BlobSha1 $StartHere) -ne $ExpectedStartHereBlob){Write-JobResult 'FAIL' 'START_HERE_FROZEN_BLOB_REPAIR_FAILED';exit 21}
 
     $Phase='RUN_EXISTING_RC3_GATE'
