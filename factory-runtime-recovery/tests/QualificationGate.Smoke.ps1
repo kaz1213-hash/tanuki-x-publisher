@@ -9,7 +9,7 @@ $save=$ast.Find({param($n)$n -is [Management.Automation.Language.FunctionDefinit
 . ([scriptblock]::Create($save.Extent.Text))
 $script:ExportResultsToDesktop=$false
 function Set-RecoveryPhase($Phase,$State){$ctx.phases+=@($Phase)}
-$base=Join-Path ([IO.Path]::GetTempPath()) ('資格 gate fixture '+[Guid]::NewGuid().ToString('N'))
+$base=Join-Path ([IO.Path]::GetTempPath()) ('格 '+[Guid]::NewGuid().ToString('N').Substring(0,12))
 [void][IO.Directory]::CreateDirectory($base)
 $passed=0
 try {

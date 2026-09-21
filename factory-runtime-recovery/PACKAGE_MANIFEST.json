@@ -1,6 +1,6 @@
 {
   "schema": "factory-recovery-package-v1",
-  "base_pr_head": "1a159029462cbd793311a17bd65bcc4aad5bf20a",
+  "base_pr_head": "5b6530dbebe68411012b8baa9cbc72254fc6d736",
   "files": [
     {
       "path": "ApplyVerifiedRecovery.ps1",
@@ -28,11 +28,15 @@
     },
     {
       "path": "SELF_AUDIT.json",
-      "sha256": "6b84f5992560528606ebd0e0ed387f82f1c7e89dca231e7ef42e7cd537a8d2b6"
+      "sha256": "6a325f7f6fe3a9e5595b3e309f4bc0c02290e4ba6d2a1d59855aa4b60427c273"
     },
     {
       "path": "SHADOW_QUALIFICATION_CONTRACT.md",
       "sha256": "62faf61a9e8c8542e855ddbd8688af72515bb93221592f38c7b2dd46122a4209"
+    },
+    {
+      "path": "SHADOW_RESULT_20260921.md",
+      "sha256": "d65c163049c937fd0778b37cb6aa2bb0f1c63ab2736ce83b09486504ac016bfa"
     },
     {
       "path": "SPECTRE_EVIDENCE_20260921.md",
@@ -64,15 +68,15 @@
     },
     {
       "path": "tests/DeliveryPath.Smoke.ps1",
-      "sha256": "590d77f797a123e24a9e47b6fa46e236914f653252cf472f052f7128d85f6b71"
+      "sha256": "cfdb214aaca7c0f4b9415f06d4263f0fd1c49daf66f63a1723b232df62af2b29"
     },
     {
       "path": "tests/InstallerFailure.Smoke.ps1",
-      "sha256": "ffeec8264bbf6a45977f3bea3c905e5d7eae18f32fafafb80cb684e98bfad22d"
+      "sha256": "7d0ebd7c533244bf7a4714fb15919dc6fb137c2e2a129052147a3353f3eb2b0f"
     },
     {
       "path": "tests/InstallerTransaction.Smoke.ps1",
-      "sha256": "593fb1de016d3d85b370876fcfcee2f32b41a6171461bbb4e60ab3fc11851932"
+      "sha256": "e7080b7bad2000e313eeebfeeeb970a7d52a28b9321252f37b1e9d07648e615f"
     },
     {
       "path": "tests/Qualification.Fixture.ps1",
@@ -80,7 +84,15 @@
     },
     {
       "path": "tests/QualificationGate.Smoke.ps1",
-      "sha256": "d1b3e1898401cb77ae106411393db61fa363442bb2231a7cdbace09df3b7605c"
+      "sha256": "d8a5e62f8b2e7a989a3a7055dbd2fb6fe96b8b02301ae0bb41b8d81b0e18af31"
+    },
+    {
+      "path": "tests/QualificationWorker.Smoke.ps1",
+      "sha256": "5da1311a80b4e075d4b4ebffcf4df97eae196dfc32996cc1a50ab16011302728"
+    },
+    {
+      "path": "tests/QualificationWorker.ps1",
+      "sha256": "7cd846f6ad52e68e18c559ae9dacf9d172b4582b394e43fa9cc008a7d33b2a7d"
     },
     {
       "path": "tests/RecoveryPolicy.Smoke.ps1",
@@ -88,11 +100,11 @@
     },
     {
       "path": "tests/ResultDelivery.Smoke.ps1",
-      "sha256": "c9248d5d8e9a240682f1e197d27e8905339c54bdbb589f51d6b50fe722a96cef"
+      "sha256": "6d7a9fc05996cdbb612fa5aece86af15532f580c339f641c1600ba03455848f3"
     },
     {
       "path": "tests/Runtime.Smoke.ps1",
-      "sha256": "dc83b3c38c7d8fd756fbd747442dd1d24949f7413ec614aee7071a74165e5f69"
+      "sha256": "ec772f65ac6bd9b23085cf4253a1558da843fc50e7b69d12fc22a4a1f4a4d537"
     },
     {
       "path": "tests/Windows.Preflight.ps1",
@@ -100,7 +112,7 @@
     },
     {
       "path": "tests/Windows.Qualification.ps1",
-      "sha256": "343a4805e7fb64455ebca674c0049c339c6ba8e1bd862fae54fcfa4ac7d99955"
+      "sha256": "69d5ebc0ef08ddccc4cbbfcd22a16910b6f9f2352ac3c52fd0ad42b5a0d8a35d"
     }
   ]
 }

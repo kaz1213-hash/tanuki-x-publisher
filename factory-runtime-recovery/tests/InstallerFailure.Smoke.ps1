@@ -2,7 +2,7 @@
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'Qualification.Fixture.ps1')
 # Run the actual installer in a disposable fixture; no scheduled task or real Factory access.
-$fixture=Join-Path ([IO.Path]::GetTempPath()) ('installer-test-'+[Guid]::NewGuid().ToString('N'))
+$fixture=Join-Path ([IO.Path]::GetTempPath()) ('i_'+[Guid]::NewGuid().ToString('N').Substring(0,12))
 New-Item -ItemType Directory -Path (Join-Path $fixture 'bin') -Force|Out-Null
 try {
     Copy-Item (Join-Path $PSScriptRoot '..\bin\FactoryRuntime.ps1') (Join-Path $fixture 'bin')

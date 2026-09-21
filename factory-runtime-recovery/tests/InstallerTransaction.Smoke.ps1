@@ -1,7 +1,7 @@
 ﻿Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'Qualification.Fixture.ps1')
-$base=Join-Path ([IO.Path]::GetTempPath()) ('復旧 fixture '+[Guid]::NewGuid().ToString('N'))
+$base=Join-Path ([IO.Path]::GetTempPath()) ('試 '+[Guid]::NewGuid().ToString('N').Substring(0,12))
 $assertions=0
 function Assert($Condition,$Message){if(-not $Condition){throw $Message};$script:assertions++}
 # Functions replace only platform/network operations and designated failure points.

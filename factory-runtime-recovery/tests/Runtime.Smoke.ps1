@@ -3,7 +3,7 @@ Set-StrictMode -Version 2.0
 . (Join-Path $PSScriptRoot '..\bin\TanukiFactoryCommon.ps1')
 . (Join-Path $PSScriptRoot '..\bin\FactoryRuntime.ps1')
 . (Join-Path $PSScriptRoot '..\bin\RecoveryPolicy.ps1')
-$script:FactoryRoot=Join-Path ([IO.Path]::GetTempPath()) ('factory-test-'+[Guid]::NewGuid().ToString('N'))
+$script:FactoryRoot=Join-Path ([IO.Path]::GetTempPath()) ('r_'+[Guid]::NewGuid().ToString('N').Substring(0,12))
 $script:EmergencyRoot=Join-Path $script:FactoryRoot 'emergency'
 New-Item -ItemType Directory -Path $script:FactoryRoot -Force | Out-Null
 $script:Passed=0

@@ -6,7 +6,7 @@ $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot
 $function=$ast.Find({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Save-RunResult'},$true)
 . ([scriptblock]::Create($function.Extent.Text))
 $script:ExportResultsToDesktop=$false
-$script:RunDirectory=Join-Path ([IO.Path]::GetTempPath()) ('delivery-test-'+[Guid]::NewGuid().ToString('N'))
+$script:RunDirectory=Join-Path ([IO.Path]::GetTempPath()) ('d_'+[Guid]::NewGuid().ToString('N').Substring(0,12))
 New-Item -ItemType Directory -Path $script:RunDirectory|Out-Null
 $script:RunState=[ordered]@{status='RUNNING';code='TEST';started_utc=[DateTime]::UtcNow.ToString('o');finished_utc=$null;factory_completion_pass=$false;automatic_result_return=$false}
 try {

@@ -2,9 +2,9 @@
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 # Phase A: disposable Spectre shadow fixtures; no installed Factory access.
-$record=[ordered]@{schema='factory-windows-qualification-v2';nonce=$Nonce;qualification='UNVERIFIED';cleanup='UNVERIFIED';finished_utc=$null;exception_class='NONE';code='STARTING';tests_completed=0;status='HOLD';phase='PLATFORM';ps51=$false;windows11=$false;fixture_tests='UNVERIFIED';native_task='UNVERIFIED';identity='UNVERIFIED';spectre_pass=$false;factory_completion_pass=$false;package_manifest_sha256=$null;exception_line=0}
+$record=[ordered]@{schema='factory-windows-qualification-v2';nonce=$Nonce;qualification='UNVERIFIED';cleanup='UNVERIFIED';finished_utc=$null;exception_class='NONE';code='STARTING';tests_completed=0;worker_result=$null;worker_exit_code=$null;shadow_path_length=0;status='HOLD';phase='PLATFORM';ps51=$false;windows11=$false;fixture_tests='UNVERIFIED';native_task='UNVERIFIED';identity='UNVERIFIED';spectre_pass=$false;factory_completion_pass=$false;package_manifest_sha256=$null;exception_line=0}
 $taskName='TanukiQualification-'+[Guid]::NewGuid().ToString('N')
-$registered=$false;$registrationAttempted=$false;$dir=$null;$shadow=$null;$shadowOwned=$false;$outputReady=$false
+$registered=$false;$registrationAttempted=$false;$dir=$null;$shadow=$null;$shadowOwned=$false;$outputReady=$false;$workerSurvivor=$false
 $originalTemp=$env:TEMP;$originalTmp=$env:TMP
 function Save-Qualification {
     $record|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $OutputDirectory 'WINDOWS_QUALIFICATION.json') -Encoding UTF8
@@ -23,7 +23,9 @@ try {
     $os=Get-CimInstance Win32_OperatingSystem
     if([int]$os.BuildNumber -lt 22000 -or [int]$os.ProductType -ne 1){throw 'WINDOWS11_CLIENT_REQUIRED'}
     $record.windows11=$true
-    $shadow=Join-Path ([IO.Path]::GetTempPath()) ('TanukiFactoryQualification_'+$Nonce)
+    $shadow=Join-Path ([IO.Path]::GetTempPath()) ('TQ_'+$Nonce)
+    $record.shadow_path_length=$shadow.Length
+    if($shadow.Length -gt 100){throw 'SHADOW_PATH_BUDGET_EXCEEDED'}
     if($shadow.StartsWith('C:\TanukiFactory\',[StringComparison]::OrdinalIgnoreCase)){throw 'SHADOW_DIRECTORY_UNSAFE'}
     if(Test-Path -LiteralPath $shadow){throw 'SHADOW_ROOT_ALREADY_EXISTS'}
     [void][IO.Directory]::CreateDirectory($shadow)
@@ -42,10 +44,18 @@ try {
     $record.identity='PASS'
     $record.phase='FIXTURE_TESTS';Save-Qualification
     $exe=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    foreach($test in @('Windows.Preflight.ps1','Runtime.Smoke.ps1','RecoveryPolicy.Smoke.ps1','InstallerFailure.Smoke.ps1','InstallerTransaction.Smoke.ps1','ResultDelivery.Smoke.ps1','QualificationGate.Smoke.ps1','DeliveryPath.Smoke.ps1')){
+    foreach($test in @('Windows.Preflight.ps1','Runtime.Smoke.ps1','RecoveryPolicy.Smoke.ps1','InstallerFailure.Smoke.ps1','InstallerTransaction.Smoke.ps1','ResultDelivery.Smoke.ps1','QualificationGate.Smoke.ps1','DeliveryPath.Smoke.ps1','QualificationWorker.Smoke.ps1')){
+        $record.worker_result=$null;$record.worker_exit_code=$null
         $record.phase=$test;Save-Qualification
-        & $exe -NoProfile -STA -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot $test) *> (Join-Path $OutputDirectory ($test+'.local.log'))
-        if($LASTEXITCODE -ne 0){throw 'FIXTURE_TEST_FAILED'}
+        $workerReceipt=Join-Path $OutputDirectory ($test+'.result.json')
+        $worker=Join-Path $PSScriptRoot 'QualificationWorker.ps1'
+        $arguments='-NoProfile -STA -NonInteractive -ExecutionPolicy Bypass -File "'+$worker+'" -TestScript "'+(Join-Path $PSScriptRoot $test)+'" -ReceiptPath "'+$workerReceipt+'"'
+        $process=Start-Process -FilePath $exe -ArgumentList $arguments -RedirectStandardOutput (Join-Path $OutputDirectory ($test+'.stdout.local.log')) -RedirectStandardError (Join-Path $OutputDirectory ($test+'.stderr.local.log')) -PassThru -WindowStyle Hidden
+        $handle=$process.Handle
+        if(-not $process.WaitForExit(180000)){$workerSurvivor=$true;throw 'SHADOW_WORKER_TIMEOUT'}
+        $process.WaitForExit();$record.worker_exit_code=$process.ExitCode
+        if(Test-Path -LiteralPath $workerReceipt){$record.worker_result=Get-Content -LiteralPath $workerReceipt -Raw -Encoding UTF8|ConvertFrom-Json}
+        if($process.ExitCode -ne 0 -or -not $record.worker_result -or $record.worker_result.status -ne 'PASS'){throw 'FIXTURE_TEST_FAILED'}
         $record.tests_completed++
     }
     $record.fixture_tests='PASS'
@@ -78,9 +88,9 @@ try {
 } catch {
     $record.status='HOLD';$record.exception_line=[int]$_.InvocationInfo.ScriptLineNumber
     $record.exception_class=if($_.Exception -is [UnauthorizedAccessException]){'ACCESS_DENIED'}elseif($_.Exception -is [IO.IOException]){'IO_ERROR'}else{'OTHER'}
-    $record.code=if($_.Exception.Message -in @('QUALIFICATION_NONCE_REQUIRED','OUTPUT_DIRECTORY_UNSAFE','SHADOW_DIRECTORY_UNSAFE','OUTPUT_DIRECTORY_REQUIRED','WINDOWS_PS51_REQUIRED','WINDOWS11_CLIENT_REQUIRED','SHADOW_ROOT_ALREADY_EXISTS','SHADOW_PARSER_FAILED','IDENTITY_ROUNDTRIP_FAILED','FIXTURE_TEST_FAILED','NATIVE_TASK_DID_NOT_RUN','NATIVE_TASK_RUNNING_NOT_OBSERVED','NATIVE_TASK_DID_NOT_STOP')){$_.Exception.Message}else{'SHADOW_QUALIFICATION_EXCEPTION'}
+    $record.code=if($_.Exception.Message -in @('QUALIFICATION_NONCE_REQUIRED','OUTPUT_DIRECTORY_UNSAFE','SHADOW_DIRECTORY_UNSAFE','SHADOW_PATH_BUDGET_EXCEEDED','SHADOW_WORKER_TIMEOUT','OUTPUT_DIRECTORY_REQUIRED','WINDOWS_PS51_REQUIRED','WINDOWS11_CLIENT_REQUIRED','SHADOW_ROOT_ALREADY_EXISTS','SHADOW_PARSER_FAILED','IDENTITY_ROUNDTRIP_FAILED','FIXTURE_TEST_FAILED','NATIVE_TASK_DID_NOT_RUN','NATIVE_TASK_RUNNING_NOT_OBSERVED','NATIVE_TASK_DID_NOT_STOP')){$_.Exception.Message}else{'SHADOW_QUALIFICATION_EXCEPTION'}
 } finally {
-    $clean=$true
+    $clean=-not $workerSurvivor
     if($registrationAttempted){
         try{
             $task=Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
@@ -92,7 +102,7 @@ try {
         }catch{$clean=$false}
     }
     $env:TEMP=$originalTemp;$env:TMP=$originalTmp
-    if($shadowOwned){try{Remove-Item -LiteralPath $shadow -Recurse -Force -ErrorAction Stop}catch{$clean=$false}}
+    if($shadowOwned -and -not $workerSurvivor){try{Remove-Item -LiteralPath $shadow -Recurse -Force -ErrorAction Stop}catch{$clean=$false}}
     $record.cleanup=if($clean){'PASS'}else{'HOLD'}
     if(-not $clean){$record.status='HOLD';$record.code='SHADOW_CLEANUP_FAILED'}
     if($record.status -eq 'PASS' -and $clean){$record.qualification='WINDOWS_PS51_SHADOW_QUALIFICATION_PASS'}

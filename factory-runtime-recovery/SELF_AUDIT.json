@@ -1,6 +1,6 @@
 {
   "schema": "factory-one-shot-self-audit-v1",
-  "base_pr_head": "1a159029462cbd793311a17bd65bcc4aad5bf20a",
+  "base_pr_head": "5b6530dbebe68411012b8baa9cbc72254fc6d736",
   "qualification_environment": "Microsoft PowerShell 7.4.19 on Linux",
   "native_parser": "PASS",
   "runtime_assertions": 24,
@@ -9,7 +9,7 @@
   "ps51_syntax_and_commands_profile": "PASS",
   "ps51_type_profile": "EXPLICIT_ASSEMBLY_LOADS_REQUIRE_ON_DEVICE_PREFLIGHT",
   "windows_generic_execution": "NOT_RUN_AI_SIDE",
-  "spectre_execution": "PRIOR_PREFLIGHT_ONLY_CURRENT_SHADOW_QUALIFICATION_RUNS_BEFORE_MUTATION",
+  "spectre_execution": "SHADOW_HOLD_RUNTIME_SMOKE_CHILD_FAILURE_UNRESOLVED",
   "native_before_mutation": [
     "Windows.Qualification.ps1",
     "Windows.Preflight.ps1",
@@ -19,7 +19,8 @@
     "InstallerFailure.Smoke.ps1",
     "InstallerTransaction.Smoke.ps1",
     "QualificationGate.Smoke.ps1",
-    "DeliveryPath.Smoke.ps1"
+    "DeliveryPath.Smoke.ps1",
+    "QualificationWorker.Smoke.ps1"
   ],
   "repair_condition": "MACHINE_CONFIRMED_HMAC_32_ARGUMENT_PRESPAWN_ONLY",
   "director_launch_count": 1,
@@ -32,12 +33,13 @@
   "product_release_pass": false,
   "installer_failure_assertions": 3,
   "installer_transaction_assertions": 41,
-  "distribution_status": "READY_FOR_GUARDED_SPECTRE_SELF_QUALIFICATION",
-  "ending_condition": "DELIVER_AUTHORIZED_GUARDED_SELF_QUALIFICATION",
+  "distribution_status": "SOURCE_FIX_ONLY_NO_SECOND_TRIAL_REQUESTED",
+  "ending_condition": "RECORD_EVIDENCE_AND_SOURCE_FIX_NO_NEW_DIRECTOR_ACTION",
   "original_installer_exception": "EXACT_PHASE_UNRESOLVED",
   "qualification_gate_assertions": 20,
   "delivery_path_assertions": 5,
-  "total_assertions": 118,
+  "total_assertions": 122,
   "qualification_before_mutation_contract": "PASS",
-  "shadow_qualification": "REQUIRED_ON_DEVICE_NOT_YET_RUN"
+  "shadow_qualification": "HOLD_ON_SPECTRE_BEFORE_FACTORY_DIAGNOSTIC_OR_MUTATION",
+  "qualification_worker_assertions": 4
 }

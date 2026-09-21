@@ -3,7 +3,7 @@ $ErrorActionPreference='Stop'
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot '..\RunRecovery.ps1'),[ref]$tokens,[ref]$errors)
 $fn=$ast.Find({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Save-RunResult'},$true)
-$base=Join-Path ([IO.Path]::GetTempPath()) ('結果 delivery '+[Guid]::NewGuid().ToString('N'))
+$base=Join-Path ([IO.Path]::GetTempPath()) ('結 '+[Guid]::NewGuid().ToString('N').Substring(0,12))
 $desktop=Join-Path $base 'Desktop 投影'
 $source=$fn.Extent.Text.Replace("[Environment]::GetFolderPath('Desktop')",("'"+$desktop.Replace("'","''")+"'"))
 . ([scriptblock]::Create($source))
