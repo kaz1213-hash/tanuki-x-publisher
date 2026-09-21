@@ -65,10 +65,14 @@
         "uke_ui.py",
         "tests/test_app_v067_persistence.py",
         "RELEASE_CANDIDATE.json",
-        "tests/test_release_candidate_v080.py"
+        "tests/test_release_candidate_v080.py",
+        "tests/test_windows_launcher_runtime.py"
       ],
       "feature_expansion": false
     },
-    "test_contract_fix": "align fail-closed external release gate assertions with RC3-specific pending gate names"
+    "test_contract_fixes": [
+      "align fail-closed external release gate assertions with RC3-specific pending gate names",
+      "keep Windows launcher runtime fixtures on the release harness private TEMP root instead of deeply nested pytest tmp_path so the test does not cross legacy MAX_PATH while preserving the same launcher assertions"
+    ]
   }
 }
