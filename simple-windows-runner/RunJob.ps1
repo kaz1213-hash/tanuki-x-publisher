@@ -202,6 +202,13 @@ try {
     $outDest = Join-Path $ResultDir 'output'
     $collected = @()
 
+    $outputRootItem = Get-Item -LiteralPath $jobOutput -Force -ErrorAction Stop
+    if(($outputRootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){ throw 'RESULT_REPARSE_POINT_UNSUPPORTED' }
+    $outputReparse = @(Get-ChildItem -LiteralPath $jobOutput -Force -Recurse -ErrorAction Stop | Where-Object {
+        ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+    })
+    if($outputReparse.Count -gt 0){ throw 'RESULT_REPARSE_POINT_UNSUPPORTED' }
+
     foreach($rel in $safeResultFiles) {
         $src = Join-Path $jobOutput $rel
         if(-not (Test-ContainedPath $jobOutput $src)){ throw 'RESULT_PATH_ESCAPE' }
