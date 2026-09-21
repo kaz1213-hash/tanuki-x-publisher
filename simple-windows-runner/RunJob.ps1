@@ -12,8 +12,8 @@ $Stderr = Join-Path $Root '_stderr.txt'
 
 $started = [DateTime]::UtcNow
 $receipt = [ordered]@{
-    schema = 'tanuki-windows-runner-result-v1'
-    runner_version = '0.1'
+    schema = 'tanuki-windows-runner-result-v2'
+    runner_version = '0.2'
     status = 'HOLD'
     phase = 'START'
     job_id = $null
@@ -65,12 +65,14 @@ try {
 
     $receipt.job_id = [string]$job.job_id
     $receipt.entrypoint = [string]$job.entrypoint
-
     if(-not (Test-SafeRelativePath $receipt.entrypoint)){ throw 'ENTRYPOINT_UNSAFE' }
 
     $timeoutMinutes = 60
     if($job.PSObject.Properties['timeout_minutes']){ $timeoutMinutes = [int]$job.timeout_minutes }
     if($timeoutMinutes -lt 1 -or $timeoutMinutes -gt 1440){ throw 'TIMEOUT_INVALID' }
+
+    $includeConsoleTail = $false
+    if($job.PSObject.Properties['include_console_tail']){ $includeConsoleTail = [bool]$job.include_console_tail }
 
     $receipt.phase = 'STAGE_JOB'
     New-Item -ItemType Directory -Path $WorkRoot -Force | Out-Null
@@ -105,7 +107,8 @@ try {
     $proc = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory $WorkRoot -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr -PassThru
     $completed = $proc.WaitForExit($timeoutMinutes * 60 * 1000)
     if(-not $completed) {
-        try { $proc.Kill() } catch {}
+        try { & taskkill.exe /PID $proc.Id /T /F 2>$null | Out-Null } catch { try { $proc.Kill() } catch {} }
+        try { $proc.WaitForExit(15000) | Out-Null } catch {}
         $receipt.status = 'HOLD'
         $receipt.error_code = 'TIMEOUT'
         $receipt.exit_code = 124
@@ -134,13 +137,15 @@ try {
         }
     }
 
-    Copy-Tail $Stdout (Join-Path $ResultDir 'stdout_tail.txt')
-    Copy-Tail $Stderr (Join-Path $ResultDir 'stderr_tail.txt')
+    if($includeConsoleTail) {
+        Copy-Tail $Stdout (Join-Path $ResultDir 'stdout_tail.txt')
+        Copy-Tail $Stderr (Join-Path $ResultDir 'stderr_tail.txt')
+    }
 }
 catch {
-    if($receipt.status -eq 'HOLD') {
-        $receipt.error_code = [string]$_.Exception.Message
-    }
+    $failedPhase = [string]$receipt.phase
+    $receipt.status = 'FAIL'
+    $receipt.error_code = 'RUNNER_EXCEPTION_' + $failedPhase
 }
 finally {
     $receipt.phase = 'TERMINAL'
@@ -156,11 +161,10 @@ finally {
         if(Test-Path -LiteralPath $ResultZip){ Remove-Item -LiteralPath $ResultZip -Force }
         Compress-Archive -Path (Join-Path $ResultDir '*') -DestinationPath $ResultZip -Force
     } catch {
-        try {
-            $receipt.result_zip_created = $false
-            if(-not $receipt.error_code){ $receipt.error_code='RESULT_ZIP_FAILED' }
-            Save-Receipt
-        } catch {}
+        $receipt.status = 'FAIL'
+        $receipt.result_zip_created = $false
+        $receipt.error_code = 'RESULT_ZIP_FAILED'
+        try { Save-Receipt } catch {}
     }
 }
 
