@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "ApplyVerifiedRecovery.ps1",
-      "sha256": "7a757411784585fd66b01976dc172b7d599aff90a18157b2c88d14ca360c2923"
+      "sha256": "e79d12c5282793dad674ef3f713483c00f2157daf3f346fde2e78531c50bfb02"
     },
     {
       "path": "COMPATIBILITY_AUDIT.md",
@@ -27,6 +27,10 @@
       "sha256": "79ecf6661a971d85eaf8968baad742d28f782dac74dfc1d2aeddf51bc6915820"
     },
     {
+      "path": "SPECTRE_EVIDENCE_20260921.md",
+      "sha256": "b39dc492e112c8f32737ba37a19afeecf7c9e6879517ab51247981723626379e"
+    },
+    {
       "path": "bin/FactoryRuntime.ps1",
       "sha256": "e89a5715179d64dfff50217e253131048a7521f89361b68489baf1eac7891014"
     },
@@ -45,6 +49,10 @@
     {
       "path": "bin/TanukiFactoryWatcher.ps1",
       "sha256": "9728c94777b6b6788fac7090aa98b5595ae98dd26232f2db948367e53a52abfb"
+    },
+    {
+      "path": "tests/InstallerFailure.Smoke.ps1",
+      "sha256": "1b20350460a7def48a8890ca6306c431bcd33786420bf4641ca4673aa5fb7a20"
     },
     {
       "path": "tests/RecoveryPolicy.Smoke.ps1",
