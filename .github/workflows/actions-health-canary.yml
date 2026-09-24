@@ -1,0 +1,17 @@
+name: Tanuki X Actions Health Canary
+
+on:
+  push:
+    paths:
+      - ".github/workflows/actions-health-canary.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Confirm Actions executor
+        run: echo "ACTIONS_EXECUTOR_OK"
