@@ -1,0 +1,1 @@
+Tanuki X recovery wake. Trigger one publisher run for the oldest due ready text post. Created 2026-09-24 22:51 JST after Director reported X inactivity. Do not fan out multiple concurrent wakes; publisher remains max one post per run.
