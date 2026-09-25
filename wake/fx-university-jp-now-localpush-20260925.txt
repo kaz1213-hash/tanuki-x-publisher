@@ -1,0 +1,4 @@
+Tanuki X immediate local push wake.
+Director explicitly requested work now on 2026-09-25 JST.
+Publish at most one due text item, persist the public receipt, and stop.
+Do not duplicate this wake.
