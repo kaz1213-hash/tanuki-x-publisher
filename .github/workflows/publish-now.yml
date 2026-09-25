@@ -1,6 +1,7 @@
 name: Tanuki X Publish Now
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - ".github/workflows/publish-now.yml"
