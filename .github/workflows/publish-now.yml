@@ -1,0 +1,47 @@
+name: Tanuki X Publish Now
+
+on:
+  push:
+    paths:
+      - ".github/workflows/publish-now.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Publish exactly the next due text item
+        env:
+          TANUKI_SOURCE_REPO: kaz1213-hash/tanuki-growth
+          TANUKI_GROWTH_READ_TOKEN: ${{ secrets.TANUKI_GROWTH_READ_TOKEN }}
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+        run: python publisher.py
+
+      - name: Persist public receipt
+        run: |
+          if [[ -z "$(git status --porcelain -- state/published.jsonl)" ]]; then
+            echo "No new publication receipt."
+            exit 0
+          fi
+          git config user.name "tanuki-x-publish-now"
+          git config user.email "actions@users.noreply.github.com"
+          git add state/published.jsonl
+          git commit -m "Record Tanuki X publication [skip ci]"
+          git push
