@@ -1,0 +1,1 @@
+Recovery wake after Director enabled repository Actions permissions on 2026-09-25. One-shot trigger; do not duplicate.
