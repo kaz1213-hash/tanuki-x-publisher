@@ -1,6 +1,7 @@
 name: Tanuki X Actions Health Canary
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - ".github/workflows/actions-health-canary.yml"
