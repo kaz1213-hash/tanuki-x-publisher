@@ -1,0 +1,1 @@
+healthcheck only; no due post should publish before 12:00 JST
