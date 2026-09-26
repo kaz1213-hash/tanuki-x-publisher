@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import argparse
 import base64
 import json
 import os
+import shutil
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,6 +42,14 @@ def _require_env(name: str) -> str:
     return value
 
 
+def _gh_path() -> str | None:
+    configured = os.environ.get("TANUKI_GH_PATH", "").strip()
+    if configured and Path(configured).is_file():
+        return configured
+    found = shutil.which("gh")
+    return found
+
+
 def _github_headers() -> dict[str, str]:
     return {
         "Authorization": f"Bearer {_require_env('TANUKI_GROWTH_READ_TOKEN')}",
@@ -48,7 +59,7 @@ def _github_headers() -> dict[str, str]:
     }
 
 
-def _github_get(path: str, *, allow_404: bool = False):
+def _github_get_with_token(path: str, *, allow_404: bool = False):
     url = f"{GITHUB_API}/repos/{SOURCE_REPO}/contents/{path}"
     response = requests.get(url, headers=_github_headers(), timeout=30)
     if allow_404 and response.status_code == 404:
@@ -56,6 +67,68 @@ def _github_get(path: str, *, allow_404: bool = False):
     if response.status_code < 200 or response.status_code >= 300:
         raise RuntimeError(f"GitHub source read failed: HTTP {response.status_code}")
     return response.json()
+
+
+def _github_get_with_gh(path: str, *, allow_404: bool = False):
+    gh = _gh_path()
+    if not gh:
+        raise RuntimeError(
+            "GitHub source access needs TANUKI_GROWTH_READ_TOKEN or an authenticated GitHub CLI."
+        )
+    endpoint = f"repos/{SOURCE_REPO}/contents/{path}"
+    proc = subprocess.run(
+        [gh, "api", "--method", "GET", endpoint],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=45,
+        check=False,
+    )
+    if allow_404 and proc.returncode != 0 and "HTTP 404" in proc.stderr:
+        return None
+    if proc.returncode != 0:
+        raise RuntimeError("GitHub source read via official CLI failed")
+    return json.loads(proc.stdout)
+
+
+def _github_get(path: str, *, allow_404: bool = False):
+    if os.environ.get("TANUKI_GROWTH_READ_TOKEN", "").strip():
+        return _github_get_with_token(path, allow_404=allow_404)
+    return _github_get_with_gh(path, allow_404=allow_404)
+
+
+def _github_put_text_with_gh(path: str, text: str, message: str) -> None:
+    gh = _gh_path()
+    if not gh:
+        raise RuntimeError("GitHub CLI is required to persist the private publication receipt")
+
+    existing = _github_get_with_gh(path, allow_404=True)
+    args = [
+        gh,
+        "api",
+        "--method",
+        "PUT",
+        f"repos/{SOURCE_REPO}/contents/{path}",
+        "-f",
+        f"message={message}",
+        "-f",
+        f"content={base64.b64encode(text.encode('utf-8')).decode('ascii')}",
+    ]
+    if isinstance(existing, dict) and existing.get("sha"):
+        args.extend(["-f", f"sha={existing['sha']}"])
+
+    proc = subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=45,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError("GitHub private receipt update failed")
 
 
 def _decode_contents_payload(payload: dict) -> str:
@@ -208,9 +281,10 @@ def _publish_text(text: str) -> tuple[str, str]:
     return post_id, f"https://x.com/i/web/status/{post_id}"
 
 
-def _append_receipt(item: QueueItem, post_id: str, url: str, text_mode: str, weighted_length: int) -> None:
-    LOCAL_STATE.parent.mkdir(parents=True, exist_ok=True)
-    row = {
+def _receipt_row(
+    item: QueueItem, post_id: str, url: str, text_mode: str, weighted_length: int
+) -> dict:
+    return {
         "id": item.item_id,
         "post_id": post_id,
         "published_at": datetime.now(timezone.utc).isoformat(),
@@ -220,15 +294,35 @@ def _append_receipt(item: QueueItem, post_id: str, url: str, text_mode: str, wei
         "text_mode": text_mode,
         "weighted_length": weighted_length,
     }
+
+
+def _append_receipt(
+    item: QueueItem, post_id: str, url: str, text_mode: str, weighted_length: int
+) -> None:
+    row = _receipt_row(item, post_id, url, text_mode, weighted_length)
+
+    LOCAL_STATE.parent.mkdir(parents=True, exist_ok=True)
     with LOCAL_STATE.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
+    if _gh_path():
+        source_state = _github_get(SOURCE_STATE_PATH, allow_404=True)
+        previous = ""
+        if source_state is not None:
+            previous = _decode_contents_payload(source_state)
+            if previous and not previous.endswith("\n"):
+                previous += "\n"
+        updated = previous + json.dumps(row, ensure_ascii=False) + "\n"
+        _github_put_text_with_gh(
+            SOURCE_STATE_PATH,
+            updated,
+            f"Record Tanuki X publication {item.item_id}",
+        )
 
-def main() -> int:
-    now = datetime.now(timezone.utc)
+
+def _due_items(now: datetime) -> tuple[list[QueueItem], list[QueueItem]]:
     published = _load_published_ids()
     queue = _load_private_queue()
-
     due = sorted(
         (
             item
@@ -237,15 +331,28 @@ def main() -> int:
         ),
         key=lambda item: (item.publish_at, item.item_id),
     )
+    return [item for item in due if not item.has_media], [
+        item for item in due if item.has_media
+    ]
 
-    text_due = [item for item in due if not item.has_media]
-    media_blocked = [item for item in due if item.has_media]
+
+def main(*, dry_run: bool = False) -> int:
+    text_due, media_blocked = _due_items(datetime.now(timezone.utc))
 
     for item in media_blocked:
         print(f"SKIP_MEDIA_UNSUPPORTED: {item.item_id}")
 
     if not text_due:
         print("NO_DUE_TEXT_POSTS")
+        return 0
+
+    if dry_run:
+        for item in text_due[:MAX_POSTS_PER_RUN]:
+            _, text_mode, weighted_length = _prepare_text(item)
+            print(
+                f"DRY_RUN_DUE: {item.item_id} mode={text_mode} "
+                f"weighted_length={weighted_length}"
+            )
         return 0
 
     for item in text_due[:MAX_POSTS_PER_RUN]:
@@ -258,4 +365,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Read queue and receipts but do not call the X API.",
+    )
+    args = parser.parse_args()
+    raise SystemExit(main(dry_run=args.dry_run))
