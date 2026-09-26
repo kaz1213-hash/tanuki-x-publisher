@@ -1,0 +1,7 @@
+{
+  "window.title": "Tanuki X - API設定",
+  "title": "X APIをこのPCに安全に保存",
+  "note": "4項目はWindowsのユーザー暗号化(DPAPI)で保存します。GitHub Actions Secretsから値を読み出すことはできません。",
+  "button.save": "安全に保存",
+  "saved": "保存しました。"
+}
