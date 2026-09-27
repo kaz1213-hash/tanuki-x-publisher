@@ -27,3 +27,32 @@ Free public GitHub Actions transport for the SCA-owned Tanuki X account.
 Do not grant write, Actions, administration, or additional repository access.
 
 No credential belongs in this public source tree.
+
+
+## Runner-local fallback
+
+GitHub Actions may be unavailable or account-restricted. Tanuki X can now run locally on a Windows Tanuki Runner without depending on GitHub Actions.
+
+Local mode:
+- uses the authenticated official GitHub CLI to read the private `kaz1213-hash/tanuki-growth` queue;
+- does not require `TANUKI_GROWTH_READ_TOKEN` when GitHub CLI auth is available;
+- supports `publisher.py --dry-run` for zero-post queue validation;
+- stores X API credentials with Windows CurrentUser DPAPI through `tools/Configure-TanukiXCredentials.ps1`;
+- runs continuously with `tools/Run-TanukiXLocal.ps1 -Continuous`;
+- can be enabled at Windows sign-in with `tools/Enable-TanukiXAutostart.ps1`;
+- keeps at most one post per polling run;
+- writes a local receipt and, when GitHub CLI is available, also updates the private canonical publication receipt.
+
+### Local credential boundary
+
+GitHub Actions secret values cannot be read back from GitHub. The existing X API credentials must therefore be entered once on the Runner PC (or regenerated in the X developer portal) before live local posting can begin. They are not stored in plaintext by the local setup.
+
+### Dogfood evidence
+
+On DESKTOP-E57JK4I:
+- GitHub Actions manual dispatch returned `Actions has been disabled for this user`.
+- Runner-local private queue access succeeded with no Actions and no GitHub PAT.
+- `publisher.py --dry-run` found the next due text item successfully.
+- DPAPI credential round-trip with fake credentials passed and plaintext was absent from the saved file.
+- local publisher autostart enable/disable passed against a temporary Startup folder.
+- the wrapper `Run-TanukiXLocal.ps1 -DryRun` passed end-to-end.
