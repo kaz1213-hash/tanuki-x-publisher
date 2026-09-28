@@ -3,7 +3,7 @@ name: Tanuki X Free Publisher
 on:
   workflow_dispatch:
   schedule:
-    - cron: "40 11 * * *"
+    - cron: "10 */3 * * *"
   push:
     paths:
       - "wake/**"
@@ -35,7 +35,10 @@ jobs:
       - name: Compile check
         run: python -m py_compile publisher.py
 
-      - name: Publish at most one due text post
+      - name: Unit tests
+        run: python -m unittest discover -s tests -p "test_*.py"
+
+      - name: Publish at most one due text post (legacy queue + promoter sprint)
         env:
           TANUKI_SOURCE_REPO: kaz1213-hash/tanuki-growth
           TANUKI_GROWTH_READ_TOKEN: ${{ secrets.TANUKI_GROWTH_READ_TOKEN }}

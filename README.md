@@ -3,10 +3,11 @@
 Free public GitHub Actions transport for the SCA-owned Tanuki X account.
 
 - Drafts and future queue content remain private in `kaz1213-hash/tanuki-growth`.
-- Publishing is deliberate and wake-triggered only: `workflow_dispatch` or a push under `wake/**`.
-- Scheduled polling is intentionally disabled so idle checks do not consume GitHub Actions.
+- Publishing supports `workflow_dispatch`, a push under `wake/**`, and a bounded **every-3-hours schedule** for the Tanuki Promoter exposure sprint.
+- The transport still publishes at most one due text item per run; the high cadence comes from more scheduled runs, not batch posting.
 - It reads the private `tanuki-growth/tanuki-x/queue` via a fine-grained read-only token.
 - Only entries with `status: "ready"` and due `publish_at` are eligible.
+- In addition to the legacy file-per-post queue, the publisher reads `tanuki-x/promoter/EXPOSURE_SPRINT_V0_1.json` from the private Growth repo.
 - At most one text post is published per run.
 - Only receipts for already-public X posts are stored here.
 - Image/Comic publishing is intentionally not handled by this v1 path.

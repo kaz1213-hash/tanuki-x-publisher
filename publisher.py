@@ -14,6 +14,7 @@ GITHUB_API = "https://api.github.com"
 SOURCE_REPO = os.environ.get("TANUKI_SOURCE_REPO", "kaz1213-hash/tanuki-growth").strip()
 QUEUE_PATH = "tanuki-x/queue"
 SOURCE_STATE_PATH = "tanuki-x/state/published.jsonl"
+PROMOTER_SPRINT_PATH = "tanuki-x/promoter/EXPOSURE_SPRINT_V0_1.json"
 LOCAL_STATE = Path("state/published.jsonl")
 
 POST_API_URL = "https://api.x.com/2/tweets"
@@ -122,6 +123,55 @@ def _load_private_queue() -> list[QueueItem]:
     return items
 
 
+def _load_promoter_sprint() -> list[QueueItem]:
+    payload = _github_get(PROMOTER_SPRINT_PATH, allow_404=True)
+    if payload is None:
+        return []
+    data = json.loads(_decode_contents_payload(payload))
+    if not isinstance(data, dict):
+        raise RuntimeError("Promoter sprint payload was not an object")
+    if data.get("schema") != "tanuki-promoter-sprint/v0.1":
+        raise RuntimeError("Unsupported promoter sprint schema")
+    raw_items = data.get("items")
+    if not isinstance(raw_items, list):
+        raise RuntimeError("Promoter sprint items was not a list")
+
+    items: list[QueueItem] = []
+    for index, row in enumerate(raw_items):
+        name = f"promoter item #{index + 1}"
+        if not isinstance(row, dict):
+            raise ValueError(f"{name}: object required")
+        if row.get("status") != "ready":
+            continue
+        item_id = row.get("id")
+        text = row.get("text")
+        short_text = row.get("short_text")
+        if not isinstance(item_id, str) or not item_id.strip():
+            raise ValueError(f"{name}: id is required")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError(f"{name}: text is required")
+        if short_text is not None and not isinstance(short_text, str):
+            raise ValueError(f"{name}: short_text must be a string when present")
+        if row.get("media_paths") or row.get("media_path"):
+            raise ValueError(f"{name}: promoter v0.1 is text-only")
+        items.append(
+            QueueItem(
+                item_id=item_id.strip(),
+                text=text.strip(),
+                short_text=(short_text or "").strip(),
+                publish_at=_parse_publish_at(row.get("publish_at")),
+                product=str(row.get("product") or ""),
+                campaign=str(row.get("campaign") or ""),
+                has_media=False,
+            )
+        )
+
+    ids = [item.item_id for item in items]
+    if len(ids) != len(set(ids)):
+        raise ValueError("Promoter sprint contains duplicate item ids")
+    return items
+
+
 def _published_ids_from_jsonl(text: str) -> set[str]:
     ids: set[str] = set()
     for line in text.splitlines():
@@ -227,7 +277,10 @@ def _append_receipt(item: QueueItem, post_id: str, url: str, text_mode: str, wei
 def main() -> int:
     now = datetime.now(timezone.utc)
     published = _load_published_ids()
-    queue = _load_private_queue()
+    queue = _load_private_queue() + _load_promoter_sprint()
+    queue_ids = [item.item_id for item in queue]
+    if len(queue_ids) != len(set(queue_ids)):
+        raise ValueError("Duplicate queue item id across legacy queue and promoter sprint")
 
     due = sorted(
         (
