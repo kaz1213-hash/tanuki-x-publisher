@@ -16,8 +16,9 @@ CONFIG_PATH = "tanuki-x/scout/SCOUT_CONFIG_V0_2.json"
 SEARCH_URL = "https://api.x.com/2/tweets/search/recent"
 BEARER_URL = "https://api.x.com/oauth2/token"
 
-CANDIDATE_STATE = Path("state/scout_candidates.jsonl")
-MARKET_STATE = Path("state/market_signals.jsonl")
+STATE_DIR = Path(os.environ.get("TANUKI_SCOUT_STATE_DIR", "state"))
+CANDIDATE_STATE = STATE_DIR / "scout_candidates.jsonl"
+MARKET_STATE = STATE_DIR / "market_signals.jsonl"
 
 
 def _require_env(name: str) -> str:
