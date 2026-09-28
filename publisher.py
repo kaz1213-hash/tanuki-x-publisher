@@ -274,16 +274,12 @@ def _append_receipt(item: QueueItem, post_id: str, url: str, text_mode: str, wei
         handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def main() -> int:
-    now = datetime.now(timezone.utc)
-    published = _load_published_ids()
-    legacy_queue = _load_private_queue()
-    promoter_queue = _load_promoter_sprint()
-    queue = legacy_queue + promoter_queue
-    queue_ids = [item.item_id for item in queue]
-    if len(queue_ids) != len(set(queue_ids)):
-        raise ValueError("Duplicate queue item id across legacy queue and promoter sprint")
-
+def _select_due_queue(
+    promoter_queue: list[QueueItem],
+    legacy_queue: list[QueueItem],
+    published: set[str],
+    now: datetime,
+) -> list[QueueItem]:
     promoter_due = sorted(
         (
             item
@@ -300,10 +296,22 @@ def main() -> int:
         ),
         key=lambda item: (item.publish_at, item.item_id),
     )
+    return promoter_due if promoter_due else legacy_due
+
+
+def main() -> int:
+    now = datetime.now(timezone.utc)
+    published = _load_published_ids()
+    legacy_queue = _load_private_queue()
+    promoter_queue = _load_promoter_sprint()
+    queue = legacy_queue + promoter_queue
+    queue_ids = [item.item_id for item in queue]
+    if len(queue_ids) != len(set(queue_ids)):
+        raise ValueError("Duplicate queue item id across legacy queue and promoter sprint")
 
     # During the bounded Promoter sprint, a due promoter item gets the slot first.
     # This prevents older legacy-ready items from starving the 8/day exposure cadence.
-    due = promoter_due if promoter_due else legacy_due
+    due = _select_due_queue(promoter_queue, legacy_queue, published, now)
 
     text_due = [item for item in due if not item.has_media]
     media_blocked = [item for item in due if item.has_media]
