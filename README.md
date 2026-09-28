@@ -28,3 +28,14 @@ Free public GitHub Actions transport for the SCA-owned Tanuki X account.
 Do not grant write, Actions, administration, or additional repository access.
 
 No credential belongs in this public source tree.
+
+
+## Tanuki Scout v0.2
+
+`scout.py` runs four times per day and uses X Recent Search to find:
+- active threads that explicitly invite self-promotion/project sharing;
+- market pain/comparison conversations for Producer research.
+
+It writes public-observation state to `state/scout_candidates.jsonl` and `state/market_signals.jsonl`.
+
+Third-party replies are intentionally **not sent** in v0.2. X's current automation rules require additional approval for brand auto-response campaigns; candidate rows therefore remain `BLOCKED_PENDING_X_AUTO_RESPONSE_APPROVAL`.
