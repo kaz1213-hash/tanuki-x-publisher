@@ -1,0 +1,59 @@
+name: Tanuki Scout
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "25 0,6,12,18 * * *"
+  push:
+    paths:
+      - "scout-wake/**"
+      - ".github/workflows/scout.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tanuki-x-scout
+  cancel-in-progress: false
+
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Compile check
+        run: python -m py_compile scout.py
+
+      - name: Unit tests
+        run: python -m unittest discover -s tests -p "test_*.py"
+
+      - name: Scan X for explicit promo threads and market signals
+        env:
+          TANUKI_SOURCE_REPO: kaz1213-hash/tanuki-growth
+          TANUKI_GROWTH_READ_TOKEN: ${{ secrets.TANUKI_GROWTH_READ_TOKEN }}
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+        run: python scout.py
+
+      - name: Persist scout state
+        run: |
+          git add state/scout_candidates.jsonl state/market_signals.jsonl 2>/dev/null || true
+          if [[ -z "$(git status --porcelain -- state/scout_candidates.jsonl state/market_signals.jsonl)" ]]; then
+            echo "No new scout state."
+            exit 0
+          fi
+          git config user.name "tanuki-x-scout"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "Record Tanuki Scout observations [skip ci]"
+          git push
