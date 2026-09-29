@@ -18,6 +18,7 @@ SCOUT_STATUS = STATE_DIR / "last_scout_status.txt"
 HUNTING_LANES = [
     {
         "target_post_id": "hunt-ja-chatgpt-pain",
+        "draft_reply": "ChatGPTの昔の会話が埋もれて探しづらいの、自分も困ってProject Vaultを作りました。対応エクスポートをローカルで保存・検索できます。$10買い切りです。\\n\\nhttps://silentcoastasset.com/project-vault.html",
         "language": "ja",
         "placement_kind": "hunting_lane",
         "prospect_intent": "pain",
@@ -29,6 +30,7 @@ HUNTING_LANES = [
     },
     {
         "target_post_id": "hunt-ja-chatgpt-usage",
+        "draft_reply": "ChatGPTを日常的に使っていると、あとで昔の会話を探すのが地味に大変で、Project Vaultというローカル整理ツールを作りました。$10買い切りです。\\n\\nhttps://silentcoastasset.com/project-vault.html",
         "language": "ja",
         "placement_kind": "hunting_lane",
         "prospect_intent": "usage",
@@ -40,6 +42,7 @@ HUNTING_LANES = [
     },
     {
         "target_post_id": "hunt-ja-story",
+        "draft_reply": "ChatGPTとの長い会話や創作ログって、あとから読むと自分の物語になってることがあって、Tanuki Chronicleという読み物化ツールを作りました。US$14.99買い切りです。\\n\\nhttps://silentcoastasset.com/tanuki-chronicle.html",
         "language": "ja",
         "placement_kind": "hunting_lane",
         "prospect_intent": "adjacent",
@@ -51,6 +54,7 @@ HUNTING_LANES = [
     },
     {
         "target_post_id": "hunt-ja-fortune",
+        "draft_reply": "ChatGPTの過去ログから、その人専用の妙に心当たりがある『札』を作るTanuki Fortuneという変な占いを作りました。端末内で完結、US$4.99買い切りです。\\n\\nhttps://silentcoastasset.com/tanuki-fortune.html",
         "language": "ja",
         "placement_kind": "hunting_lane",
         "prospect_intent": "adjacent",
@@ -62,6 +66,7 @@ HUNTING_LANES = [
     },
     {
         "target_post_id": "hunt-ja-fx",
+        "draft_reply": "昔のFX自動売買をChatGPTで復活させようとしたら、教授6人・研究班・監査制度までできて、最後はKindle本『FX大学』になりました。EAやバックテスト好き向けです。\\n\\nhttps://www.amazon.co.jp/dp/B0H1M3VY6B",
         "language": "ja",
         "placement_kind": "hunting_lane",
         "prospect_intent": "question",
@@ -73,6 +78,7 @@ HUNTING_LANES = [
     },
     {
         "target_post_id": "hunt-en-chatgpt",
+        "draft_reply": "I built a few small Tanuki tools around ChatGPT use: Project Vault for local searchable archives, Chronicle for turning long conversations into a story, and Fortune for an oddly personal local fortune from your own logs.\\n\\nhttps://silentcoastasset.com",
         "language": "en",
         "placement_kind": "hunting_lane",
         "prospect_intent": "usage",
@@ -236,8 +242,8 @@ class PlacementConsole:
         ).pack(side=RIGHT, padx=8)
 
         note = (
-            "宣伝歓迎＝明示的に共有OK。見込み客会話＝質問・困りごと・利用中・関連話題。"
-            " 見込み客会話は宣伝歓迎とは限らないので、最後のPostは所長が文脈を見て判断します。"
+            "狩場候補では返信案も用意します。『狩場を開く＋返信コピー』でX検索を開き、返信文をクリップボードへコピーします。"
+            " 投稿先を選んで文脈を確認し、貼り付けて最後のPostだけ所長が判断します。"
         )
         Label(root, text=note, wraplength=930, justify="left", font=("Segoe UI", 9)).pack(fill="x", padx=18, pady=(4, 12))
 
@@ -276,7 +282,7 @@ class PlacementConsole:
         self.counter.set(f"{self.index + 1} / {len(self.rows)}")
         placement_kind = str(row.get("placement_kind") or "invitation")
         if placement_kind == "hunting_lane":
-            self.primary_button.configure(text="🦝 Xで狩場を開く")
+            self.primary_button.configure(text="🦝 狩場を開く＋返信コピー")
         else:
             self.primary_button.configure(text="🦝 Xで返信を開く")
         intent = str(row.get("prospect_intent") or "")
@@ -311,6 +317,11 @@ class PlacementConsole:
         if not row:
             return
         if row.get("placement_kind") == "hunting_lane":
+            draft = self.draft.get("1.0", END).strip()
+            if draft:
+                self.root.clipboard_clear()
+                self.root.clipboard_append(draft)
+                self.root.update()
             query = str(row.get("search_query") or "").strip()
             if query:
                 webbrowser.open("https://x.com/search?" + urlencode({
