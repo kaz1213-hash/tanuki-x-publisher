@@ -5,9 +5,9 @@ import os
 import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
-from tkinter import BOTH, END, LEFT, RIGHT, VERTICAL, Button, Frame, Label, Scrollbar, StringVar, Text, Tk, messagebox
-from tkinter import ttk
+from tkinter import BOTH, END, LEFT, RIGHT, Button, Frame, Label, StringVar, Text, Tk, messagebox
 from urllib.parse import urlencode
+import subprocess
 
 ROOT = Path(os.environ.get("LOCALAPPDATA", ".")) / "TanukiXPublisher"
 STATE_DIR = Path(os.environ.get("TANUKI_SCOUT_STATE_DIR", ROOT / "placement-state"))
@@ -49,6 +49,7 @@ def record_handled(row: dict, action: str) -> None:
         "target_username": row.get("target_username"),
         "target_text": row.get("target_text"),
         "placement_kind": row.get("placement_kind"),
+        "prospect_intent": row.get("prospect_intent"),
         "lane": row.get("lane"),
         "draft_product_key": row.get("draft_product_key"),
         "draft_product_name": row.get("draft_product_name"),
@@ -143,9 +144,18 @@ class PlacementConsole:
             pady=10,
         ).pack(side=RIGHT)
 
+        Button(
+            actions,
+            text="再スキャン",
+            command=self.rescan,
+            font=("Segoe UI", 11),
+            padx=12,
+            pady=10,
+        ).pack(side=RIGHT, padx=8)
+
         note = (
-            "宣伝歓迎＝明示的に共有を募っているスレ。話題スレ＝ChatGPT等の関連会話で、宣伝歓迎とは限りません。"
-            " どちらも最後のPostは所長が判断して押します。"
+            "宣伝歓迎＝明示的に共有OK。見込み客会話＝質問・困りごと・利用中・関連話題。"
+            " 見込み客会話は宣伝歓迎とは限らないので、最後のPostは所長が文脈を見て判断します。"
         )
         Label(root, text=note, wraplength=930, justify="left", font=("Segoe UI", 9)).pack(fill="x", padx=18, pady=(4, 12))
 
@@ -174,7 +184,14 @@ class PlacementConsole:
         metrics = row.get("metrics") or {}
         self.counter.set(f"{self.index + 1} / {len(self.rows)}")
         placement_kind = str(row.get("placement_kind") or "invitation")
-        placement_label = "話題スレ" if placement_kind == "topic" else "宣伝歓迎"
+        intent = str(row.get("prospect_intent") or "")
+        labels = {
+            "question": "質問・募集",
+            "pain": "困りごと",
+            "usage": "ChatGPT利用中",
+            "adjacent": "関連話題",
+        }
+        placement_label = labels.get(intent, "見込み客会話" if placement_kind == "prospect" else "宣伝歓迎")
         self.meta.set(
             f"[{placement_label}] @{row.get('target_username') or '?'}  |  "
             f"返信 {metrics.get('reply_count', 0)}  いいね {metrics.get('like_count', 0)}  "
@@ -216,6 +233,21 @@ class PlacementConsole:
         webbrowser.open(url)
         record_handled(row, "OPENED_REPLY_INTENT")
         self.advance()
+
+    def rescan(self) -> None:
+        script = ROOT / "repo" / "local_windows" / "run_manual_placement.ps1"
+        if not script.exists():
+            messagebox.showerror("Tanuki Placement", "再スキャン用スクリプトが見つかりません。")
+            return
+        subprocess.Popen([
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(script),
+        ])
+        self.root.destroy()
 
     def skip(self) -> None:
         row = self.current()
