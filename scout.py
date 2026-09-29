@@ -17,7 +17,7 @@ SEARCH_URL = "https://api.x.com/2/tweets/search/recent"
 BEARER_URL = "https://api.x.com/oauth2/token"
 
 STATE_DIR = Path(os.environ.get("TANUKI_SCOUT_STATE_DIR", "state"))
-CANDIDATE_STATE = STATE_DIR / "scout_candidates.jsonl"
+CANDIDATE_STATE = STATE_DIR / "scout_candidates_v03.jsonl"
 MARKET_STATE = STATE_DIR / "market_signals.jsonl"
 
 
@@ -100,6 +100,35 @@ def _search_recent(bearer: str, query: str, *, max_results: int = 50) -> dict:
 
 def _casefold(value: object) -> str:
     return str(value or "").casefold()
+
+
+def _contains_any(text: str, phrases: list[object]) -> list[str]:
+    body = _casefold(text)
+    hits: list[str] = []
+    for phrase in phrases:
+        value = str(phrase or "").strip()
+        if value and _casefold(value) in body:
+            hits.append(value)
+    return hits
+
+
+def _thread_relevant(text: str, config: dict) -> bool:
+    relevance = config.get("relevance") or {}
+    off_topic = _contains_any(text, relevance.get("off_topic_any") or [])
+    if not off_topic:
+        return True
+    builder_hits = _contains_any(text, relevance.get("generic_builder_any") or [])
+    return bool(builder_hits)
+
+
+def _product_fit(text: str, product_key: str, config: dict) -> tuple[int, list[str]]:
+    relevance = config.get("relevance") or {}
+    product_cfg = ((relevance.get("product_affinity") or {}).get(product_key) or {})
+    hits = _contains_any(text, product_cfg.get("terms") or [])
+    score = len(set(_casefold(hit) for hit in hits)) * 2
+    if _contains_any(text, relevance.get("generic_builder_any") or []):
+        score += int(product_cfg.get("generic_bias") or 0)
+    return score, hits
 
 
 def _invitation_gate(text: str, language: str, config: dict) -> bool:
@@ -189,19 +218,35 @@ def _append_rows(path: Path, rows: list[dict]) -> None:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def _draft_for(post_id: str, language: str, config: dict) -> tuple[str, str, str]:
+def _draft_for(post_id: str, language: str, text: str, config: dict) -> tuple[str, str, str, int, str] | None:
     products = [
         row for row in (config.get("draft_products") or [])
         if isinstance(row, dict) and language in (row.get("languages") or [])
     ]
     if not products:
         raise RuntimeError(f"No draft products configured for language={language}")
+
+    relevance = config.get("relevance") or {}
+    scored: list[tuple[int, str, dict, list[str]]] = []
+    for product in products:
+        key = str(product.get("key") or "")
+        if relevance:
+            fit, hits = _product_fit(text, key, config)
+        else:
+            fit, hits = 1, []
+        scored.append((fit, key, product, hits))
+
+    scored.sort(key=lambda row: (-row[0], row[1]))
+    fit, product_key, product, hits = scored[0]
+    min_fit = int((config.get("limits") or {}).get("min_product_fit") or (1 if relevance else 0))
+    if fit < min_fit:
+        return None
+
     digest = int(hashlib.sha256(post_id.encode("utf-8")).hexdigest(), 16)
-    product = products[digest % len(products)]
     drafts = ((product.get("drafts") or {}).get(language) or [])
     if not drafts:
         raise RuntimeError("Selected draft product has no compatible draft")
-    base = str(drafts[(digest // max(1, len(products))) % len(drafts)]).strip()
+    base = str(drafts[digest % len(drafts)]).strip()
     intros = {
         "en": [
             "Thanks for opening the thread — dropping one:",
@@ -221,11 +266,17 @@ def _draft_for(post_id: str, language: str, config: dict) -> tuple[str, str, str
         url = str(product.get("url_ja") or product.get("url") or "").strip()
     else:
         url = str(product.get("url_en") or product.get("url") or "").strip()
-    text = f"{intro}\n\n{base}"
+    reply = f"{intro}\n\n{base}"
     if url:
-        text += f"\n\n{url}"
-    return str(product.get("key") or ""), str(product.get("name") or ""), text
+        reply += f"\n\n{url}"
 
+    if hits:
+        reason = " / ".join(hits[:4])
+    elif _contains_any(text, relevance.get("generic_builder_any") or []):
+        reason = "generic builder / product thread"
+    else:
+        reason = "explicit promotion thread"
+    return product_key, str(product.get("name") or ""), reply, fit, reason
 
 def _post_url(username: str, post_id: str) -> str:
     if username:
@@ -249,6 +300,8 @@ def _collect_invitation_candidates(payload: dict, language: str, config: dict, k
         text = str(post.get("text") or "")
         if not _invitation_gate(text, language, config):
             continue
+        if not _thread_relevant(text, config):
+            continue
         created = _parse_created_at(post.get("created_at"))
         if created is None:
             continue
@@ -261,9 +314,14 @@ def _collect_invitation_candidates(payload: dict, language: str, config: dict, k
         author_id = str(post.get("author_id") or "")
         user = users.get(author_id) or {}
         username = str(user.get("username") or "")
-        product_key, product_name, draft = _draft_for(post_id, language, config)
+        product_choice = _draft_for(post_id, language, text, config)
+        if product_choice is None:
+            continue
+        product_key, product_name, draft, fit_score, fit_reason = product_choice
+        crowd_score = _score(post, user)
+        placement_score = round(crowd_score + fit_score * 15.0, 2)
         rows.append({
-            "schema": "tanuki-scout-candidate/v0.2",
+            "schema": "tanuki-scout-candidate/v0.3",
             "observed_at": now.isoformat(),
             "target_post_id": post_id,
             "target_url": _post_url(username, post_id),
@@ -273,7 +331,10 @@ def _collect_invitation_candidates(payload: dict, language: str, config: dict, k
             "created_at": created.isoformat(),
             "age_hours": round(age_hours, 2),
             "metrics": metrics,
-            "score": _score(post, user),
+            "crowd_score": crowd_score,
+            "fit_score": fit_score,
+            "fit_reason": fit_reason,
+            "score": placement_score,
             "target_text": text[:1000],
             "draft_product_key": product_key,
             "draft_product_name": product_name,
