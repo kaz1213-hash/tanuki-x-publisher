@@ -308,6 +308,112 @@ class ScoutTests(unittest.TestCase):
         self.assertEqual(rows[0]["send_status"], "MANUAL_ONLY_TOPIC_PLACEMENT")
 
 
+    def test_prospect_intent_prefers_question_over_usage(self):
+        config = {
+            **CONFIG,
+            "prospect_intent": {
+                "question": {"bonus": 80, "ja": ["何に使ってる"], "en": ["what do you use"]},
+                "pain": {"bonus": 65, "ja": ["探せない"], "en": ["can't find"]},
+                "usage": {"bonus": 35, "ja": ["使ってる"], "en": ["using chatgpt"]},
+                "adjacent": {"bonus": 20, "ja": ["物語"], "en": ["story"]},
+            },
+        }
+        kind, bonus, hits = scout._classify_prospect_intent("ChatGPT、みんな何に使ってる？", "ja", config)
+        self.assertEqual(kind, "question")
+        self.assertEqual(bonus, 80)
+        self.assertIn("何に使ってる", hits)
+
+    def test_prospect_collector_accepts_usage_conversation(self):
+        config = {
+            **CONFIG,
+            "limits": {
+                **CONFIG["limits"],
+                "prospect_max_age_hours": 48,
+                "prospect_min_replies": 1,
+            },
+            "prospect_gate": {
+                "require_domain_ja": ["chatgpt", "生成ai"],
+                "require_domain_en": ["chatgpt", "generative ai"],
+                "reject_any": ["giveaway", "宣伝禁止"],
+            },
+            "prospect_intent": {
+                "question": {"bonus": 80, "ja": ["何に使ってる"], "en": ["what do you use"]},
+                "pain": {"bonus": 65, "ja": ["探せない"], "en": ["can't find"]},
+                "usage": {"bonus": 35, "ja": ["使ってる"], "en": ["using chatgpt"]},
+                "adjacent": {"bonus": 20, "ja": ["物語"], "en": ["story"]},
+            },
+        }
+        now = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
+        payload = {
+            "data": [{
+                "id": "usage-1",
+                "text": "ChatGPTずっと使ってる。最近は仕事のメモにも使う。",
+                "author_id": "u1",
+                "created_at": "2026-09-29T10:00:00Z",
+                "public_metrics": {
+                    "reply_count": 2,
+                    "like_count": 6,
+                    "retweet_count": 0,
+                    "quote_count": 0,
+                },
+            }]
+        }
+        rows = scout._collect_prospect_candidates(payload, "ja", "chatgpt-prospect", config, set(), now)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["placement_kind"], "prospect")
+        self.assertEqual(rows[0]["prospect_intent"], "usage")
+        self.assertEqual(rows[0]["send_status"], "MANUAL_ONLY_PROSPECT_PLACEMENT")
+
+    def test_prospect_collector_rejects_dead_low_engagement(self):
+        config = {
+            **CONFIG,
+            "limits": {
+                **CONFIG["limits"],
+                "prospect_max_age_hours": 48,
+                "prospect_min_replies": 1,
+            },
+            "prospect_gate": {
+                "require_domain_ja": ["chatgpt"],
+                "require_domain_en": ["chatgpt"],
+                "reject_any": [],
+            },
+            "prospect_intent": {
+                "question": {"bonus": 80, "ja": [], "en": []},
+                "pain": {"bonus": 65, "ja": [], "en": []},
+                "usage": {"bonus": 35, "ja": ["使ってる"], "en": ["using chatgpt"]},
+                "adjacent": {"bonus": 20, "ja": [], "en": []},
+            },
+        }
+        now = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
+        payload = {
+            "data": [{
+                "id": "dead",
+                "text": "ChatGPT使ってる",
+                "author_id": "u1",
+                "created_at": "2026-09-29T10:00:00Z",
+                "public_metrics": {
+                    "reply_count": 0,
+                    "like_count": 1,
+                    "retweet_count": 0,
+                    "quote_count": 0,
+                },
+            }]
+        }
+        self.assertEqual(
+            scout._collect_prospect_candidates(payload, "ja", "chatgpt-prospect", config, set(), now),
+            [],
+        )
+
+    def test_author_diversity_limits_repeat_posters(self):
+        rows = [
+            {"target_post_id": "a1", "target_author_id": "a", "score": 100},
+            {"target_post_id": "a2", "target_author_id": "a", "score": 90},
+            {"target_post_id": "b1", "target_author_id": "b", "score": 80},
+        ]
+        selected = scout._limit_per_author(rows, 1)
+        self.assertEqual([row["target_post_id"] for row in selected], ["a1", "b1"])
+
+
 
 if __name__ == "__main__":
     unittest.main()
