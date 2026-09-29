@@ -142,6 +142,27 @@ def _invitation_gate(text: str, language: str, config: dict) -> bool:
     return any(_casefold(phrase) in body for phrase in phrases)
 
 
+def _topic_gate(text: str, language: str, config: dict) -> bool:
+    gate = config.get("topic_gate") or {}
+    body = _casefold(text)
+
+    reject = (config.get("invitation_gate") or {}).get("reject_any") or []
+    for phrase in reject:
+        if _casefold(phrase) in body:
+            return False
+
+    domain_key = "require_domain_ja" if language == "ja" else "require_domain_en"
+    context_key = "require_context_ja" if language == "ja" else "require_context_en"
+    domains = gate.get(domain_key) or []
+    contexts = gate.get(context_key) or []
+    if not domains or not contexts:
+        return False
+    return (
+        any(_casefold(phrase) in body for phrase in domains)
+        and any(_casefold(phrase) in body for phrase in contexts)
+    )
+
+
 def _parse_created_at(raw: object) -> datetime | None:
     if not isinstance(raw, str) or not raw.strip():
         return None
@@ -218,7 +239,7 @@ def _append_rows(path: Path, rows: list[dict]) -> None:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def _draft_for(post_id: str, language: str, text: str, config: dict) -> tuple[str, str, str, int, str] | None:
+def _draft_for(post_id: str, language: str, text: str, config: dict, placement_kind: str = "invitation") -> tuple[str, str, str, int, str] | None:
     products = [
         row for row in (config.get("draft_products") or [])
         if isinstance(row, dict) and language in (row.get("languages") or [])
@@ -247,7 +268,7 @@ def _draft_for(post_id: str, language: str, text: str, config: dict) -> tuple[st
     if not drafts:
         raise RuntimeError("Selected draft product has no compatible draft")
     base = str(drafts[digest % len(drafts)]).strip()
-    intros = {
+    invitation_intros = {
         "en": [
             "Thanks for opening the thread — dropping one:",
             "One project for the thread:",
@@ -261,6 +282,21 @@ def _draft_for(post_id: str, language: str, text: str, config: dict) -> tuple[st
             "タヌキ棚から一つ置いていきます。🦝",
         ],
     }
+    topic_intros = {
+        "en": [
+            "That use case reminded me of a small thing I built:",
+            "This is close to an experiment I have been building:",
+            "I went down a similar rabbit hole and built this:",
+            "Related to that ChatGPT use case, I made this:",
+        ],
+        "ja": [
+            "その使い方つながりで、こんなのも作っています。",
+            "似た沼に入って、こんなのを作りました。",
+            "ChatGPTの使い道から派生して、こんなのを作っています。",
+            "その話題に近い小さな実験を置いていきます。🦝",
+        ],
+    }
+    intros = topic_intros if placement_kind == "topic" else invitation_intros
     intro = intros[language][(digest // 17) % len(intros[language])]
     if language == "ja":
         url = str(product.get("url_ja") or product.get("url") or "").strip()
@@ -314,7 +350,7 @@ def _collect_invitation_candidates(payload: dict, language: str, config: dict, k
         author_id = str(post.get("author_id") or "")
         user = users.get(author_id) or {}
         username = str(user.get("username") or "")
-        product_choice = _draft_for(post_id, language, text, config)
+        product_choice = _draft_for(post_id, language, text, config, placement_kind="invitation")
         if product_choice is None:
             continue
         product_key, product_name, draft, fit_score, fit_reason = product_choice
@@ -328,6 +364,7 @@ def _collect_invitation_candidates(payload: dict, language: str, config: dict, k
             "target_author_id": author_id,
             "target_username": username,
             "language": language,
+            "placement_kind": "invitation",
             "created_at": created.isoformat(),
             "age_hours": round(age_hours, 2),
             "metrics": metrics,
@@ -341,6 +378,82 @@ def _collect_invitation_candidates(payload: dict, language: str, config: dict, k
             "draft_reply": draft,
             "send_status": "BLOCKED_PENDING_X_AUTO_RESPONSE_APPROVAL",
         })
+    rows.sort(key=lambda row: (-float(row["score"]), float(row["age_hours"])))
+    return rows
+
+
+def _collect_topic_candidates(
+    payload: dict,
+    language: str,
+    lane: str,
+    config: dict,
+    known: set[str],
+    now: datetime,
+) -> list[dict]:
+    limits = config.get("limits") or {}
+    max_age_hours = float(limits.get("target_max_age_hours") or 36)
+    min_replies = int(limits.get("target_min_replies") or 0)
+    max_replies = int(limits.get("target_max_replies") or 999999)
+    users = _user_map(payload)
+    rows: list[dict] = []
+
+    for post in payload.get("data") or []:
+        if not isinstance(post, dict):
+            continue
+        post_id = str(post.get("id") or "")
+        if not post_id or post_id in known:
+            continue
+        text = str(post.get("text") or "")
+        if not _topic_gate(text, language, config):
+            continue
+        if not _thread_relevant(text, config):
+            continue
+
+        created = _parse_created_at(post.get("created_at"))
+        if created is None:
+            continue
+        age_hours = (now - created).total_seconds() / 3600
+        if age_hours < 0 or age_hours > max_age_hours:
+            continue
+
+        metrics = _metrics(post)
+        if metrics["reply_count"] < min_replies or metrics["reply_count"] > max_replies:
+            continue
+
+        author_id = str(post.get("author_id") or "")
+        user = users.get(author_id) or {}
+        username = str(user.get("username") or "")
+        product_choice = _draft_for(post_id, language, text, config, placement_kind="topic")
+        if product_choice is None:
+            continue
+        product_key, product_name, draft, fit_score, fit_reason = product_choice
+        crowd_score = _score(post, user)
+        placement_score = round(crowd_score + fit_score * 15.0, 2)
+
+        rows.append({
+            "schema": "tanuki-scout-candidate/v0.4",
+            "observed_at": now.isoformat(),
+            "target_post_id": post_id,
+            "target_url": _post_url(username, post_id),
+            "target_author_id": author_id,
+            "target_username": username,
+            "language": language,
+            "placement_kind": "topic",
+            "lane": lane,
+            "created_at": created.isoformat(),
+            "age_hours": round(age_hours, 2),
+            "metrics": metrics,
+            "crowd_score": crowd_score,
+            "fit_score": fit_score,
+            "fit_reason": fit_reason,
+            "score": placement_score,
+            "target_text": text[:1000],
+            "draft_product_key": product_key,
+            "draft_product_name": product_name,
+            "draft_reply": draft,
+            "send_status": "MANUAL_ONLY_TOPIC_PLACEMENT",
+        })
+
     rows.sort(key=lambda row: (-float(row["score"]), float(row["age_hours"])))
     return rows
 
@@ -452,6 +565,32 @@ def main() -> int:
                 now,
             )
         )
+
+    topic_rows: list[dict] = []
+    for spec in config.get("topic_searches") or []:
+        if calls >= max_calls:
+            break
+        payload = _search_recent(bearer, str(spec["query"]))
+        calls += 1
+        topic_rows.extend(
+            _collect_topic_candidates(
+                payload,
+                str(spec.get("language") or "en"),
+                str(spec.get("lane") or "topic"),
+                config,
+                known_candidates
+                | {row["target_post_id"] for row in candidate_rows}
+                | {row["target_post_id"] for row in topic_rows},
+                now,
+            )
+        )
+
+    topic_limit = int(limits.get("topic_candidate_rows_per_run") or candidate_limit)
+    topic_rows = sorted(
+        topic_rows,
+        key=lambda row: (-float(row["score"]), float(row["age_hours"])),
+    )[:topic_limit]
+    candidate_rows.extend(topic_rows)
 
     for spec in config.get("market_searches") or []:
         if calls >= max_calls:
