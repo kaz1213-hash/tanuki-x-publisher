@@ -66,6 +66,22 @@ def load_candidates() -> list[dict]:
         if str(row.get("target_post_id") or "") not in done
     ]
     rows.sort(key=lambda r: (-float(r.get("score") or 0), float(r.get("age_hours") or 9999)))
+
+    # If both languages exist, interleave them so Japanese leads are not buried
+    # under higher-volume English builder threads.
+    ja = [row for row in rows if str(row.get("language") or "") == "ja"]
+    en = [row for row in rows if str(row.get("language") or "") == "en"]
+    other = [row for row in rows if str(row.get("language") or "") not in {"ja", "en"}]
+    if ja and en:
+        mixed: list[dict] = []
+        limit = max(len(ja), len(en))
+        for i in range(limit):
+            if i < len(ja):
+                mixed.append(ja[i])
+            if i < len(en):
+                mixed.append(en[i])
+        mixed.extend(other)
+        return mixed
     return rows
 
 

@@ -375,6 +375,48 @@ def _collect_market_signals(payload: dict, label: str, language: str, known: set
     return rows
 
 
+def _select_language_balanced_candidates(
+    candidate_rows: list[dict],
+    candidate_limit: int,
+    per_language: object,
+) -> list[dict]:
+    rows = sorted(
+        candidate_rows,
+        key=lambda row: (-float(row["score"]), float(row["age_hours"])),
+    )
+    if not isinstance(per_language, dict) or not per_language:
+        return rows[:candidate_limit]
+
+    selected: list[dict] = []
+    selected_ids: set[str] = set()
+    for language, raw_limit in per_language.items():
+        try:
+            language_limit = max(0, int(raw_limit))
+        except (TypeError, ValueError):
+            language_limit = 0
+        if language_limit <= 0:
+            continue
+        lang_rows = [row for row in rows if str(row.get("language") or "") == str(language)]
+        for row in lang_rows[:language_limit]:
+            selected.append(row)
+            selected_ids.add(str(row.get("target_post_id") or ""))
+
+    if len(selected) < candidate_limit:
+        for row in rows:
+            row_id = str(row.get("target_post_id") or "")
+            if row_id in selected_ids:
+                continue
+            selected.append(row)
+            selected_ids.add(row_id)
+            if len(selected) >= candidate_limit:
+                break
+
+    return sorted(
+        selected[:candidate_limit],
+        key=lambda row: (-float(row["score"]), float(row["age_hours"])),
+    )
+
+
 def main() -> int:
     config = _load_config()
     if config.get("auto_reply_enabled") is True:
@@ -426,9 +468,12 @@ def main() -> int:
             )
         )
 
-    candidate_rows.sort(key=lambda row: (-float(row["score"]), float(row["age_hours"])))
+    candidate_rows = _select_language_balanced_candidates(
+        candidate_rows,
+        candidate_limit,
+        limits.get("candidate_rows_per_language") or {},
+    )
     market_rows.sort(key=lambda row: -float(row["score"]))
-    candidate_rows = candidate_rows[:candidate_limit]
     market_rows = market_rows[:market_limit]
 
     _append_rows(CANDIDATE_STATE, candidate_rows)

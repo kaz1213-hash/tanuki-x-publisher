@@ -168,6 +168,23 @@ class ScoutTests(unittest.TestCase):
         self.assertIn("fit_reason", rows[0])
 
 
+    def test_language_balance_keeps_japanese_candidates_visible(self):
+        rows = [
+            {"target_post_id": f"en-{i}", "language": "en", "score": 200 - i, "age_hours": 1}
+            for i in range(10)
+        ] + [
+            {"target_post_id": "ja-1", "language": "ja", "score": 50, "age_hours": 1},
+            {"target_post_id": "ja-2", "language": "ja", "score": 40, "age_hours": 1},
+        ]
+        selected = scout._select_language_balanced_candidates(
+            rows,
+            6,
+            {"ja": 2, "en": 4},
+        )
+        self.assertEqual(sum(1 for row in selected if row["language"] == "ja"), 2)
+        self.assertEqual(sum(1 for row in selected if row["language"] == "en"), 4)
+
+
 
 if __name__ == "__main__":
     unittest.main()
