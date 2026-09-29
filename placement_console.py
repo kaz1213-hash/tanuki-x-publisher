@@ -13,6 +13,7 @@ ROOT = Path(os.environ.get("LOCALAPPDATA", ".")) / "TanukiXPublisher"
 STATE_DIR = Path(os.environ.get("TANUKI_SCOUT_STATE_DIR", ROOT / "placement-state"))
 CANDIDATES = STATE_DIR / "scout_candidates_v03.jsonl"
 HANDLED = STATE_DIR / "manual_placements.jsonl"
+SCOUT_STATUS = STATE_DIR / "last_scout_status.txt"
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -185,7 +186,16 @@ class PlacementConsole:
         row = self.current()
         if row is None:
             self.counter.set("候補 0")
-            self.meta.set("いま使える『人がいる場所』はありません。あとで起動し直せば再スキャンします。")
+            status = ""
+            if SCOUT_STATUS.exists():
+                try:
+                    status = SCOUT_STATUS.read_text(encoding="utf-8-sig").strip().upper()
+                except OSError:
+                    status = ""
+            if status == "FAILED":
+                self.meta.set("X API検索が使えません。『Xで狩場を開く』ならX公式検索で今すぐ掘れます。")
+            else:
+                self.meta.set("いまの自動候補は一巡しました。『再スキャン』か『Xで狩場を開く』で続行できます。")
             self.set_text(self.target, "")
             self.draft.delete("1.0", END)
             return
