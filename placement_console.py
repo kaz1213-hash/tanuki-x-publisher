@@ -153,6 +153,15 @@ class PlacementConsole:
             pady=10,
         ).pack(side=RIGHT, padx=8)
 
+        Button(
+            actions,
+            text="Xで狩場を開く",
+            command=self.open_hunting_ground,
+            font=("Segoe UI", 11),
+            padx=12,
+            pady=10,
+        ).pack(side=RIGHT, padx=8)
+
         note = (
             "宣伝歓迎＝明示的に共有OK。見込み客会話＝質問・困りごと・利用中・関連話題。"
             " 見込み客会話は宣伝歓迎とは限らないので、最後のPostは所長が文脈を見て判断します。"
@@ -233,6 +242,18 @@ class PlacementConsole:
         webbrowser.open(url)
         record_handled(row, "OPENED_REPLY_INTENT")
         self.advance()
+
+    def open_hunting_ground(self) -> None:
+        queries = [
+            '(ChatGPT OR 生成AI OR FX自動売買 OR EA) (使ってる OR おすすめ OR 履歴 OR 整理 OR 物語 OR 小説 OR 占い OR タロット)',
+            '(ChatGPT OR "trading bot") ("using ChatGPT" OR recommend OR "chat history" OR story OR fiction OR tarot OR fortune)',
+        ]
+        for query in queries:
+            webbrowser.open("https://x.com/search?" + urlencode({
+                "q": query,
+                "src": "typed_query",
+                "f": "live",
+            }))
 
     def rescan(self) -> None:
         script = ROOT / "repo" / "local_windows" / "run_manual_placement.ps1"
