@@ -555,6 +555,21 @@ def _collect_market_signals(payload: dict, label: str, language: str, known: set
     return rows
 
 
+def _limit_per_author(rows: list[dict], max_per_author: int) -> list[dict]:
+    limit = max(1, int(max_per_author or 1))
+    counts: dict[str, int] = {}
+    out: list[dict] = []
+    for row in rows:
+        author_id = str(row.get("target_author_id") or "")
+        if author_id:
+            seen = counts.get(author_id, 0)
+            if seen >= limit:
+                continue
+            counts[author_id] = seen + 1
+        out.append(row)
+    return out
+
+
 def _select_language_balanced_candidates(
     candidate_rows: list[dict],
     candidate_limit: int,
@@ -679,17 +694,10 @@ def main() -> int:
         candidate_limit * 3,
         {},
     )
-    max_per_author = max(1, int(limits.get("candidate_rows_per_author") or 1))
-    author_counts: dict[str, int] = {}
-    diverse_rows: list[dict] = []
-    for row in candidate_rows:
-        author_id = str(row.get("target_author_id") or "")
-        if author_id:
-            seen = author_counts.get(author_id, 0)
-            if seen >= max_per_author:
-                continue
-            author_counts[author_id] = seen + 1
-        diverse_rows.append(row)
+    diverse_rows = _limit_per_author(
+        candidate_rows,
+        int(limits.get("candidate_rows_per_author") or 1),
+    )
 
     candidate_rows = _select_language_balanced_candidates(
         diverse_rows,
