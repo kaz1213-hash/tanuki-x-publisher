@@ -15,6 +15,7 @@ SOURCE_REPO = os.environ.get("TANUKI_SOURCE_REPO", "kaz1213-hash/tanuki-growth")
 CONFIG_PATH = "tanuki-x/scout/SCOUT_CONFIG_V0_2.json"
 SEARCH_URL = "https://api.x.com/2/tweets/search/recent"
 BEARER_URL = "https://api.x.com/oauth2/token"
+SEARCH_RESULTS_PER_CALL = 10
 
 STATE_DIR = Path(os.environ.get("TANUKI_SCOUT_STATE_DIR", "state"))
 CANDIDATE_STATE = STATE_DIR / "scout_candidates_v03.jsonl"
@@ -77,17 +78,19 @@ def _app_bearer() -> str:
     return token
 
 
-def _search_recent(bearer: str, query: str, *, max_results: int = 50) -> dict:
+def _search_params(query: str, max_results: int = SEARCH_RESULTS_PER_CALL) -> dict[str, object]:
+    return {
+        "query": query,
+        "max_results": max(10, min(max_results, SEARCH_RESULTS_PER_CALL)),
+        "tweet.fields": "id,text,author_id,created_at,public_metrics,lang,conversation_id",
+    }
+
+
+def _search_recent(bearer: str, query: str, *, max_results: int = SEARCH_RESULTS_PER_CALL) -> dict:
     response = requests.get(
         SEARCH_URL,
         headers={"Authorization": f"Bearer {bearer}"},
-        params={
-            "query": query,
-            "max_results": max(10, min(max_results, 100)),
-            "tweet.fields": "id,text,author_id,created_at,public_metrics,lang,conversation_id",
-            "expansions": "author_id",
-            "user.fields": "id,username,name,verified,public_metrics",
-        },
+        params=_search_params(query, max_results),
         timeout=30,
     )
     if response.status_code < 200 or response.status_code >= 300:

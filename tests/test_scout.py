@@ -366,6 +366,13 @@ class ScoutTests(unittest.TestCase):
         self.assertEqual([row["target_post_id"] for row in selected], ["a1", "b1"])
 
 
+    def test_search_params_are_cost_guarded(self):
+        params = scout._search_params("ChatGPT")
+        self.assertEqual(params["max_results"], 10)
+        self.assertNotIn("expansions", params)
+        self.assertNotIn("user.fields", params)
+
+
 
 if __name__ == "__main__":
     unittest.main()
