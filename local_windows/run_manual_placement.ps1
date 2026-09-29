@@ -4,6 +4,7 @@ $Root = Join-Path $env:LOCALAPPDATA "TanukiXPublisher"
 $Repo = Join-Path $Root "repo"
 $SecretPath = Join-Path $Root "x-secrets.dpapi.json"
 $StateDir = Join-Path $Root "placement-state"
+$ScoutStatus = Join-Path $StateDir "last_scout_status.txt"
 $Python = Join-Path $Repo ".venv\Scripts\python.exe"
 
 function Unprotect([string]$Cipher) {
@@ -35,7 +36,10 @@ try {
 
     & $Python scout.py
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "Scout scan failed. Opening the last saved candidates instead."
+        "FAILED" | Set-Content -LiteralPath $ScoutStatus -Encoding UTF8
+        Write-Warning "Scout scan failed. Opening saved candidates / manual hunting-ground fallback."
+    } else {
+        "OK" | Set-Content -LiteralPath $ScoutStatus -Encoding UTF8
     }
 
     Start-Process -FilePath $Python -ArgumentList @("placement_console.py")

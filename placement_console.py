@@ -13,6 +13,7 @@ ROOT = Path(os.environ.get("LOCALAPPDATA", ".")) / "TanukiXPublisher"
 STATE_DIR = Path(os.environ.get("TANUKI_SCOUT_STATE_DIR", ROOT / "placement-state"))
 CANDIDATES = STATE_DIR / "scout_candidates_v03.jsonl"
 HANDLED = STATE_DIR / "manual_placements.jsonl"
+SCOUT_STATUS = STATE_DIR / "last_scout_status.txt"
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -153,6 +154,15 @@ class PlacementConsole:
             pady=10,
         ).pack(side=RIGHT, padx=8)
 
+        Button(
+            actions,
+            text="Xで狩場を開く",
+            command=self.open_hunting_ground,
+            font=("Segoe UI", 11),
+            padx=12,
+            pady=10,
+        ).pack(side=RIGHT, padx=8)
+
         note = (
             "宣伝歓迎＝明示的に共有OK。見込み客会話＝質問・困りごと・利用中・関連話題。"
             " 見込み客会話は宣伝歓迎とは限らないので、最後のPostは所長が文脈を見て判断します。"
@@ -176,7 +186,16 @@ class PlacementConsole:
         row = self.current()
         if row is None:
             self.counter.set("候補 0")
-            self.meta.set("いま使える『人がいる場所』はありません。あとで起動し直せば再スキャンします。")
+            status = ""
+            if SCOUT_STATUS.exists():
+                try:
+                    status = SCOUT_STATUS.read_text(encoding="utf-8-sig").strip().upper()
+                except OSError:
+                    status = ""
+            if status == "FAILED":
+                self.meta.set("X API検索が使えません。『Xで狩場を開く』ならX公式検索で今すぐ掘れます。")
+            else:
+                self.meta.set("いまの自動候補は一巡しました。『再スキャン』か『Xで狩場を開く』で続行できます。")
             self.set_text(self.target, "")
             self.draft.delete("1.0", END)
             return
@@ -233,6 +252,18 @@ class PlacementConsole:
         webbrowser.open(url)
         record_handled(row, "OPENED_REPLY_INTENT")
         self.advance()
+
+    def open_hunting_ground(self) -> None:
+        queries = [
+            '(ChatGPT OR 生成AI OR FX自動売買 OR EA) (使ってる OR おすすめ OR 履歴 OR 整理 OR 物語 OR 小説 OR 占い OR タロット)',
+            '(ChatGPT OR "trading bot") ("using ChatGPT" OR recommend OR "chat history" OR story OR fiction OR tarot OR fortune)',
+        ]
+        for query in queries:
+            webbrowser.open("https://x.com/search?" + urlencode({
+                "q": query,
+                "src": "typed_query",
+                "f": "live",
+            }))
 
     def rescan(self) -> None:
         script = ROOT / "repo" / "local_windows" / "run_manual_placement.ps1"
