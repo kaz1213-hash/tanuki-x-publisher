@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +21,8 @@ LOCAL_STATE = Path("state/published.jsonl")
 POST_API_URL = "https://api.x.com/2/tweets"
 MAX_POST_WEIGHT = 280
 MAX_POSTS_PER_RUN = 1
+AUTOMATIC_URLS_ALLOWED = False
+URL_RE = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -198,6 +201,15 @@ def _load_published_ids() -> set[str]:
     return ids
 
 
+def _strip_urls(text: str) -> str:
+    if AUTOMATIC_URLS_ALLOWED:
+        return text.strip()
+    cleaned = URL_RE.sub("", text)
+    cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
 def _text_weight(text: str) -> int:
     return sum(1 if ord(ch) < 128 else 2 for ch in text)
 
@@ -223,13 +235,24 @@ def _trim_to_weight(text: str, max_weight: int = MAX_POST_WEIGHT) -> str:
 
 
 def _prepare_text(item: QueueItem) -> tuple[str, str, int]:
-    if _text_weight(item.text) <= MAX_POST_WEIGHT:
-        return item.text, "original", _text_weight(item.text)
-    if item.short_text and _text_weight(item.short_text) <= MAX_POST_WEIGHT:
-        return item.short_text, "short_text", _text_weight(item.short_text)
-    source = item.short_text or item.text
+    text = _strip_urls(item.text)
+    short_text = _strip_urls(item.short_text) if item.short_text else ""
+    if not text and not short_text:
+        raise ValueError(f"{item.item_id}: automatic post became empty after URL removal")
+
+    text_changed = text != item.text.strip()
+    short_changed = bool(item.short_text) and short_text != item.short_text.strip()
+
+    if text and _text_weight(text) <= MAX_POST_WEIGHT:
+        mode = "url_stripped" if text_changed else "original"
+        return text, mode, _text_weight(text)
+    if short_text and _text_weight(short_text) <= MAX_POST_WEIGHT:
+        mode = "short_text_url_stripped" if short_changed else "short_text"
+        return short_text, mode, _text_weight(short_text)
+    source = short_text or text
     fitted = _trim_to_weight(source)
-    return fitted, "auto_fitted", _text_weight(fitted)
+    mode = "auto_fitted_url_stripped" if (text_changed or short_changed) else "auto_fitted"
+    return fitted, mode, _text_weight(fitted)
 
 
 def _oauth1() -> OAuth1:
