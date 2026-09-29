@@ -15,6 +15,75 @@ CANDIDATES = STATE_DIR / "scout_candidates_v03.jsonl"
 HANDLED = STATE_DIR / "manual_placements.jsonl"
 SCOUT_STATUS = STATE_DIR / "last_scout_status.txt"
 
+HUNTING_LANES = [
+    {
+        "target_post_id": "hunt-ja-chatgpt-pain",
+        "language": "ja",
+        "placement_kind": "hunting_lane",
+        "prospect_intent": "pain",
+        "target_username": "X検索",
+        "target_text": "ChatGPTの履歴・会話整理・昔のチャットが見つからない人を探す",
+        "draft_product_name": "Project Vault",
+        "fit_reason": "ChatGPT履歴 / 整理 / 検索",
+        "search_query": '(ChatGPT OR 生成AI) (履歴 OR 会話 OR 整理 OR 探せない OR 見つからない OR 埋もれた)',
+    },
+    {
+        "target_post_id": "hunt-ja-chatgpt-usage",
+        "language": "ja",
+        "placement_kind": "hunting_lane",
+        "prospect_intent": "usage",
+        "target_username": "X検索",
+        "target_text": "ChatGPTを何に使っているか話している人を探す",
+        "draft_product_name": "Project Vault",
+        "fit_reason": "ChatGPT利用者",
+        "search_query": 'ChatGPT (何に使ってる OR どう使ってる OR 使ってる OR 活用 OR 課金)',
+    },
+    {
+        "target_post_id": "hunt-ja-story",
+        "language": "ja",
+        "placement_kind": "hunting_lane",
+        "prospect_intent": "adjacent",
+        "target_username": "X検索",
+        "target_text": "ChatGPTで物語・小説・日記・創作をしている人を探す",
+        "draft_product_name": "Tanuki Chronicle",
+        "fit_reason": "物語 / 小説 / 日記 / 創作",
+        "search_query": '(ChatGPT OR 生成AI) (物語 OR 小説 OR 創作 OR 日記 OR ストーリー)',
+    },
+    {
+        "target_post_id": "hunt-ja-fortune",
+        "language": "ja",
+        "placement_kind": "hunting_lane",
+        "prospect_intent": "adjacent",
+        "target_username": "X検索",
+        "target_text": "ChatGPT占い・タロット・おみくじで遊んでいる人を探す",
+        "draft_product_name": "Tanuki Fortune",
+        "fit_reason": "占い / タロット / おみくじ",
+        "search_query": '(ChatGPT OR 生成AI) (占い OR タロット OR おみくじ OR 運勢)',
+    },
+    {
+        "target_post_id": "hunt-ja-fx",
+        "language": "ja",
+        "placement_kind": "hunting_lane",
+        "prospect_intent": "question",
+        "target_username": "X検索",
+        "target_text": "EA・MT4/MT5・FX自動売買の情報交換をしている人を探す",
+        "draft_product_name": "FX University",
+        "fit_reason": "EA / MT4 / MT5 / FX自動売買",
+        "search_query": '(FX自動売買 OR 自動売買 OR EA OR MT4 OR MT5) (使ってる OR おすすめ OR 教えて OR 情報交換 OR バックテスト)',
+    },
+    {
+        "target_post_id": "hunt-en-chatgpt",
+        "language": "en",
+        "placement_kind": "hunting_lane",
+        "prospect_intent": "usage",
+        "target_username": "X Search",
+        "target_text": "Find English ChatGPT users talking about history, stories, or tarot",
+        "draft_product_name": "Vault / Chronicle / Fortune",
+        "fit_reason": "English ChatGPT users",
+        "search_query": 'ChatGPT ("chat history" OR "using ChatGPT" OR story OR fiction OR tarot OR fortune)',
+    },
+]
+
 
 def read_jsonl(path: Path) -> list[dict]:
     if not path.exists():
@@ -86,7 +155,9 @@ def load_candidates() -> list[dict]:
                 mixed.append(en[i])
         mixed.extend(other)
         return mixed
-    return rows
+    if rows:
+        return rows
+    return [dict(row) for row in HUNTING_LANES]
 
 
 class PlacementConsole:
@@ -118,14 +189,15 @@ class PlacementConsole:
         actions = Frame(root)
         actions.pack(fill="x", padx=18, pady=8)
 
-        Button(
+        self.primary_button = Button(
             actions,
             text="🦝 Xで返信を開く",
             command=self.open_reply,
             font=("Segoe UI", 14, "bold"),
             padx=18,
             pady=10,
-        ).pack(side=LEFT)
+        )
+        self.primary_button.pack(side=LEFT)
 
         Button(
             actions,
@@ -203,6 +275,10 @@ class PlacementConsole:
         metrics = row.get("metrics") or {}
         self.counter.set(f"{self.index + 1} / {len(self.rows)}")
         placement_kind = str(row.get("placement_kind") or "invitation")
+        if placement_kind == "hunting_lane":
+            self.primary_button.configure(text="🦝 Xで狩場を開く")
+        else:
+            self.primary_button.configure(text="🦝 Xで返信を開く")
         intent = str(row.get("prospect_intent") or "")
         labels = {
             "question": "質問・募集",
@@ -210,7 +286,10 @@ class PlacementConsole:
             "usage": "ChatGPT利用中",
             "adjacent": "関連話題",
         }
-        placement_label = labels.get(intent, "見込み客会話" if placement_kind == "prospect" else "宣伝歓迎")
+        if placement_kind == "hunting_lane":
+            placement_label = "狩場候補"
+        else:
+            placement_label = labels.get(intent, "見込み客会話" if placement_kind == "prospect" else "宣伝歓迎")
         self.meta.set(
             f"[{placement_label}] @{row.get('target_username') or '?'}  |  "
             f"返信 {metrics.get('reply_count', 0)}  いいね {metrics.get('like_count', 0)}  "
@@ -229,12 +308,32 @@ class PlacementConsole:
 
     def open_source(self) -> None:
         row = self.current()
-        if row and row.get("target_url"):
+        if not row:
+            return
+        if row.get("placement_kind") == "hunting_lane":
+            query = str(row.get("search_query") or "").strip()
+            if query:
+                webbrowser.open("https://x.com/search?" + urlencode({
+                    "q": query,
+                    "src": "typed_query",
+                    "f": "live",
+                }))
+            return
+        if row.get("target_url"):
             webbrowser.open(str(row["target_url"]))
 
     def open_reply(self) -> None:
         row = self.current()
         if not row:
+            return
+        if row.get("placement_kind") == "hunting_lane":
+            query = str(row.get("search_query") or "").strip()
+            if query:
+                webbrowser.open("https://x.com/search?" + urlencode({
+                    "q": query,
+                    "src": "typed_query",
+                    "f": "live",
+                }))
             return
         post_id = str(row.get("target_post_id") or "")
         if not post_id:
@@ -283,6 +382,14 @@ class PlacementConsole:
     def skip(self) -> None:
         row = self.current()
         if not row:
+            return
+        if row.get("placement_kind") == "hunting_lane":
+            if self.rows:
+                first = self.rows.pop(self.index)
+                self.rows.append(first)
+                if self.index >= len(self.rows):
+                    self.index = 0
+            self.show_current()
             return
         record_handled(row, "SKIPPED")
         self.advance()
