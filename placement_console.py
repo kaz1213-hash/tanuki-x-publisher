@@ -48,6 +48,8 @@ def record_handled(row: dict, action: str) -> None:
         "target_url": row.get("target_url"),
         "target_username": row.get("target_username"),
         "target_text": row.get("target_text"),
+        "placement_kind": row.get("placement_kind"),
+        "lane": row.get("lane"),
         "draft_product_key": row.get("draft_product_key"),
         "draft_product_name": row.get("draft_product_name"),
         "fit_score": row.get("fit_score"),
@@ -142,8 +144,8 @@ class PlacementConsole:
         ).pack(side=RIGHT)
 
         note = (
-            "「Xで返信を開く」はX公式Web Intentを使い、返信先と文章を入れたXの投稿画面を開きます。"
-            " 最後のPostボタンだけ所長が押します。"
+            "宣伝歓迎＝明示的に共有を募っているスレ。話題スレ＝ChatGPT等の関連会話で、宣伝歓迎とは限りません。"
+            " どちらも最後のPostは所長が判断して押します。"
         )
         Label(root, text=note, wraplength=930, justify="left", font=("Segoe UI", 9)).pack(fill="x", padx=18, pady=(4, 12))
 
@@ -171,8 +173,10 @@ class PlacementConsole:
 
         metrics = row.get("metrics") or {}
         self.counter.set(f"{self.index + 1} / {len(self.rows)}")
+        placement_kind = str(row.get("placement_kind") or "invitation")
+        placement_label = "話題スレ" if placement_kind == "topic" else "宣伝歓迎"
         self.meta.set(
-            f"@{row.get('target_username') or '?'}  |  "
+            f"[{placement_label}] @{row.get('target_username') or '?'}  |  "
             f"返信 {metrics.get('reply_count', 0)}  いいね {metrics.get('like_count', 0)}  "
             f"RT {metrics.get('retweet_count', 0)}  |  crowd {row.get('crowd_score', row.get('score', 0))}  |  "
             f"fit {row.get('fit_score', '?')}  |  {row.get('age_hours', '?')}h前  |  "
