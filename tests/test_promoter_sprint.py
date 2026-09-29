@@ -1,6 +1,7 @@
 import base64
 import json
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 import publisher
@@ -63,6 +64,36 @@ class PromoterSprintTests(unittest.TestCase):
         with patch.object(publisher, "_github_get", return_value=contents_payload(data)):
             with self.assertRaises(ValueError):
                 publisher._load_promoter_sprint()
+
+    def test_prepare_text_strips_urls_from_automatic_posts(self):
+        item = publisher.QueueItem(
+            item_id="url",
+            text="Useful thing.\n\nhttps://example.com/product",
+            short_text="",
+            publish_at=datetime(2026, 9, 30, tzinfo=timezone.utc),
+            product="P",
+            campaign="C",
+            has_media=False,
+        )
+        text, mode, _ = publisher._prepare_text(item)
+        self.assertEqual(text, "Useful thing.")
+        self.assertEqual(mode, "url_stripped")
+        self.assertNotIn("http", text)
+
+    def test_prepare_text_keeps_url_free_posts_unchanged(self):
+        item = publisher.QueueItem(
+            item_id="plain",
+            text="No link here.",
+            short_text="",
+            publish_at=datetime(2026, 9, 30, tzinfo=timezone.utc),
+            product="P",
+            campaign="C",
+            has_media=False,
+        )
+        text, mode, _ = publisher._prepare_text(item)
+        self.assertEqual(text, "No link here.")
+        self.assertEqual(mode, "original")
+
 
 
 if __name__ == "__main__":
