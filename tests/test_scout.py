@@ -272,7 +272,8 @@ class ScoutTests(unittest.TestCase):
         self.assertEqual(story[0], "tanuki-chronicle")
         self.assertEqual(fortune[0], "tanuki-fortune")
         self.assertEqual(usage[0], "project-vault")
-        self.assertIn("使い道", story[2])
+        self.assertIn("Chronicle", story[2])
+        self.assertNotIn("スレお借りします", story[2])
 
     def test_topic_candidate_is_manual_only(self):
         config = {
