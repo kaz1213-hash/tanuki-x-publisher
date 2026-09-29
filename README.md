@@ -12,6 +12,16 @@ Free public GitHub Actions transport for the SCA-owned Tanuki X account.
 - Only receipts for already-public X posts are stored here.
 - Image/Comic publishing is intentionally not handled by this v1 path.
 
+
+## Eco mode
+
+Automatic Tanuki X publishing is intentionally **URL-free**.
+
+- Promoter and legacy queue text is sanitized before API publishing.
+- Any `http://`, `https://`, or `www.` URL is removed from automatic posts.
+- Manual Placement through the X website may still use product links.
+- This keeps routine automated writes on the cheaper plain-Post path and avoids accidental URL-bearing API writes.
+
 ## Required Actions secrets
 
 - `TANUKI_GROWTH_READ_TOKEN`
