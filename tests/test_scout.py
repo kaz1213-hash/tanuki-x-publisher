@@ -198,6 +198,115 @@ class ScoutTests(unittest.TestCase):
         self.assertTrue(scout._invitation_gate("個人開発のみなさん、アプリ貼ってください！", "ja", config))
 
 
+    def test_topic_gate_accepts_chatgpt_story_and_fortune_threads(self):
+        config = {
+            **CONFIG,
+            "topic_gate": {
+                "require_domain_ja": ["chatgpt", "生成ai", "ai"],
+                "require_domain_en": ["chatgpt", "generative ai", "ai"],
+                "require_context_ja": ["使い方", "物語", "小説", "占い", "タロット"],
+                "require_context_en": ["how do you use", "story", "fiction", "fortune", "tarot"],
+            },
+        }
+        self.assertTrue(scout._topic_gate("ChatGPTで物語を作ってる人いる？", "ja", config))
+        self.assertTrue(scout._topic_gate("ChatGPT占い、みんなどう使ってる？", "ja", config))
+        self.assertTrue(scout._topic_gate("How do you use ChatGPT for writing stories?", "en", config))
+        self.assertFalse(scout._topic_gate("今日は普通の小説を読んだ", "ja", config))
+
+    def test_topic_product_fit_routes_story_and_fortune(self):
+        config = {
+            **CONFIG,
+            "topic_gate": {
+                "require_domain_ja": ["chatgpt", "ai"],
+                "require_domain_en": ["chatgpt", "ai"],
+                "require_context_ja": ["使い方", "物語", "小説", "占い", "タロット"],
+                "require_context_en": ["how do you use", "story", "fiction", "fortune", "tarot"],
+            },
+            "relevance": {
+                "off_topic_any": [],
+                "generic_builder_any": ["chatgpt", "ai"],
+                "product_affinity": {
+                    "project-vault": {
+                        "terms": ["chatgpt", "使い方", "how do you use"],
+                        "generic_bias": 3,
+                    },
+                    "tanuki-chronicle": {
+                        "terms": ["chatgpt", "物語", "小説", "story", "fiction"],
+                        "generic_bias": 2,
+                    },
+                    "tanuki-fortune": {
+                        "terms": ["chatgpt", "占い", "タロット", "fortune", "tarot"],
+                        "generic_bias": 2,
+                    },
+                },
+            },
+            "draft_products": [
+                {
+                    "key": "project-vault",
+                    "name": "Project Vault",
+                    "languages": ["ja", "en"],
+                    "url": "https://example.com/vault",
+                    "drafts": {"ja": ["Vault"], "en": ["Vault"]},
+                },
+                {
+                    "key": "tanuki-chronicle",
+                    "name": "Tanuki Chronicle",
+                    "languages": ["ja", "en"],
+                    "url": "https://example.com/chronicle",
+                    "drafts": {"ja": ["Chronicle"], "en": ["Chronicle"]},
+                },
+                {
+                    "key": "tanuki-fortune",
+                    "name": "Tanuki Fortune",
+                    "languages": ["ja", "en"],
+                    "url": "https://example.com/fortune",
+                    "drafts": {"ja": ["Fortune"], "en": ["Fortune"]},
+                },
+            ],
+        }
+
+        story = scout._draft_for("story", "ja", "ChatGPTで小説と物語を作ってる", config, placement_kind="topic")
+        fortune = scout._draft_for("fortune", "ja", "ChatGPTで占いとタロットを試してる", config, placement_kind="topic")
+        usage = scout._draft_for("usage", "ja", "ChatGPTの使い方、みんなどうしてる？", config, placement_kind="topic")
+
+        self.assertEqual(story[0], "tanuki-chronicle")
+        self.assertEqual(fortune[0], "tanuki-fortune")
+        self.assertEqual(usage[0], "project-vault")
+        self.assertIn("使い道", story[2])
+
+    def test_topic_candidate_is_manual_only(self):
+        config = {
+            **CONFIG,
+            "topic_gate": {
+                "require_domain_ja": ["chatgpt", "ai"],
+                "require_domain_en": ["chatgpt", "ai"],
+                "require_context_ja": ["使い方", "物語"],
+                "require_context_en": ["how do you use", "story"],
+            },
+        }
+        now = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
+        payload = {
+            "data": [
+                {
+                    "id": "topic-1",
+                    "text": "ChatGPTの使い方、みんなどうしてる？",
+                    "author_id": "u1",
+                    "created_at": "2026-09-29T10:00:00Z",
+                    "public_metrics": {
+                        "reply_count": 5,
+                        "like_count": 10,
+                        "retweet_count": 0,
+                        "quote_count": 0,
+                    },
+                }
+            ]
+        }
+        rows = scout._collect_topic_candidates(payload, "ja", "chatgpt-topic", config, set(), now)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["placement_kind"], "topic")
+        self.assertEqual(rows[0]["send_status"], "MANUAL_ONLY_TOPIC_PLACEMENT")
+
+
 
 if __name__ == "__main__":
     unittest.main()
