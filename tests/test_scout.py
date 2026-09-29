@@ -185,6 +185,19 @@ class ScoutTests(unittest.TestCase):
         self.assertEqual(sum(1 for row in selected if row["language"] == "en"), 4)
 
 
+    def test_japanese_self_made_app_mention_is_not_an_invitation(self):
+        config = {
+            **CONFIG,
+            "invitation_gate": {
+                "require_any_en": ["drop your project", "show me what you built"],
+                "require_any_ja": ["宣伝どうぞ", "作品貼って", "アプリ貼って"],
+                "reject_any": ["no promo", "宣伝禁止"],
+            },
+        }
+        self.assertFalse(scout._invitation_gate("自作アプリの攻略本を作った！", "ja", config))
+        self.assertTrue(scout._invitation_gate("個人開発のみなさん、アプリ貼ってください！", "ja", config))
+
+
 
 if __name__ == "__main__":
     unittest.main()
