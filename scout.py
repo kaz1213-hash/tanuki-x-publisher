@@ -142,25 +142,30 @@ def _invitation_gate(text: str, language: str, config: dict) -> bool:
     return any(_casefold(phrase) in body for phrase in phrases)
 
 
-def _topic_gate(text: str, language: str, config: dict) -> bool:
-    gate = config.get("topic_gate") or {}
+def _prospect_gate(text: str, language: str, config: dict) -> bool:
+    gate = config.get("prospect_gate") or {}
     body = _casefold(text)
 
-    reject = (config.get("invitation_gate") or {}).get("reject_any") or []
-    for phrase in reject:
+    for phrase in gate.get("reject_any") or []:
         if _casefold(phrase) in body:
             return False
 
     domain_key = "require_domain_ja" if language == "ja" else "require_domain_en"
-    context_key = "require_context_ja" if language == "ja" else "require_context_en"
     domains = gate.get(domain_key) or []
-    contexts = gate.get(context_key) or []
-    if not domains or not contexts:
-        return False
-    return (
-        any(_casefold(phrase) in body for phrase in domains)
-        and any(_casefold(phrase) in body for phrase in contexts)
-    )
+    return bool(domains) and any(_casefold(phrase) in body for phrase in domains)
+
+
+def _classify_prospect_intent(text: str, language: str, config: dict) -> tuple[str, int, list[str]]:
+    rules = config.get("prospect_intent") or {}
+    order = ("question", "pain", "usage", "adjacent")
+    body = _casefold(text)
+    for kind in order:
+        spec = rules.get(kind) or {}
+        phrases = spec.get(language) or []
+        hits = [str(p) for p in phrases if _casefold(p) in body]
+        if hits:
+            return kind, int(spec.get("bonus") or 0), hits
+    return "adjacent", 0, []
 
 
 def _parse_created_at(raw: object) -> datetime | None:
@@ -239,7 +244,7 @@ def _append_rows(path: Path, rows: list[dict]) -> None:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def _draft_for(post_id: str, language: str, text: str, config: dict, placement_kind: str = "invitation") -> tuple[str, str, str, int, str] | None:
+def _draft_for(post_id: str, language: str, text: str, config: dict, placement_kind: str = "invitation", prospect_intent: str = "") -> tuple[str, str, str, int, str] | None:
     products = [
         row for row in (config.get("draft_products") or [])
         if isinstance(row, dict) and language in (row.get("languages") or [])
@@ -282,21 +287,61 @@ def _draft_for(post_id: str, language: str, text: str, config: dict, placement_k
             "タヌキ棚から一つ置いていきます。🦝",
         ],
     }
-    topic_intros = {
-        "en": [
-            "That use case reminded me of a small thing I built:",
-            "This is close to an experiment I have been building:",
-            "I went down a similar rabbit hole and built this:",
-            "Related to that ChatGPT use case, I made this:",
-        ],
-        "ja": [
-            "その使い方つながりで、こんなのも作っています。",
-            "似た沼に入って、こんなのを作りました。",
-            "ChatGPTの使い道から派生して、こんなのを作っています。",
-            "その話題に近い小さな実験を置いていきます。🦝",
-        ],
+    prospect_intros = {
+        "question": {
+            "en": [
+                "That question is close to something I built:",
+                "One thing that may be relevant to what you are asking:",
+                "I ran into a similar use case and built this:",
+            ],
+            "ja": [
+                "その問いにかなり近い用途で、こんなのを作っています。",
+                "それに近い使い道で作ったものがあります。",
+                "似た用途で困って、こんなのを作りました。",
+            ],
+        },
+        "pain": {
+            "en": [
+                "That pain point is exactly why I built this:",
+                "I hit a very similar problem and ended up building this:",
+                "This came out of almost the same annoyance:",
+            ],
+            "ja": [
+                "その困り方、かなり近いところからこれを作りました。",
+                "似たところで詰まって、こんなのを作りました。",
+                "まさにその面倒から生えた道具があります。",
+            ],
+        },
+        "usage": {
+            "en": [
+                "That ChatGPT use case reminded me of a small thing I built:",
+                "I use ChatGPT in a similar direction, and it led to this:",
+                "That use case sent me down a similar rabbit hole:",
+            ],
+            "ja": [
+                "そのChatGPTの使い方つながりで、こんなのも作っています。",
+                "似た使い方をしていて、そこからこれが生えました。",
+                "その使い道から派生して、こんなのを作っています。",
+            ],
+        },
+        "adjacent": {
+            "en": [
+                "Related to that topic, I built a small experiment:",
+                "That is close to a weird little thing I have been building:",
+                "This topic reminded me of one Tanuki experiment:",
+            ],
+            "ja": [
+                "その話題つながりで、小さな実験をひとつ。",
+                "その話に近いところで、こんなのを作っています。",
+                "その沼の近くで生えたタヌキ製品があります。🦝",
+            ],
+        },
     }
-    intros = topic_intros if placement_kind == "topic" else invitation_intros
+    if placement_kind == "prospect":
+        intent_intros = prospect_intros.get(prospect_intent) or prospect_intros["adjacent"]
+        intros = intent_intros
+    else:
+        intros = invitation_intros
     intro = intros[language][(digest // 17) % len(intros[language])]
     if language == "ja":
         url = str(product.get("url_ja") or product.get("url") or "").strip()
@@ -382,7 +427,7 @@ def _collect_invitation_candidates(payload: dict, language: str, config: dict, k
     return rows
 
 
-def _collect_topic_candidates(
+def _collect_prospect_candidates(
     payload: dict,
     language: str,
     lane: str,
@@ -391,8 +436,8 @@ def _collect_topic_candidates(
     now: datetime,
 ) -> list[dict]:
     limits = config.get("limits") or {}
-    max_age_hours = float(limits.get("target_max_age_hours") or 36)
-    min_replies = int(limits.get("target_min_replies") or 0)
+    max_age_hours = float(limits.get("prospect_max_age_hours") or limits.get("target_max_age_hours") or 48)
+    min_replies = int(limits.get("prospect_min_replies") or 1)
     max_replies = int(limits.get("target_max_replies") or 999999)
     users = _user_map(payload)
     rows: list[dict] = []
@@ -404,9 +449,13 @@ def _collect_topic_candidates(
         if not post_id or post_id in known:
             continue
         text = str(post.get("text") or "")
-        if not _topic_gate(text, language, config):
+        if not _prospect_gate(text, language, config):
             continue
         if not _thread_relevant(text, config):
+            continue
+
+        prospect_intent, intent_bonus, intent_hits = _classify_prospect_intent(text, language, config)
+        if intent_bonus <= 0 and not intent_hits:
             continue
 
         created = _parse_created_at(post.get("created_at"))
@@ -417,28 +466,46 @@ def _collect_topic_candidates(
             continue
 
         metrics = _metrics(post)
-        if metrics["reply_count"] < min_replies or metrics["reply_count"] > max_replies:
+        total_engagement = (
+            metrics["reply_count"]
+            + metrics["like_count"]
+            + metrics["retweet_count"]
+            + metrics["quote_count"]
+        )
+        if metrics["reply_count"] > max_replies:
+            continue
+        if metrics["reply_count"] < min_replies and total_engagement < 5:
             continue
 
         author_id = str(post.get("author_id") or "")
         user = users.get(author_id) or {}
         username = str(user.get("username") or "")
-        product_choice = _draft_for(post_id, language, text, config, placement_kind="topic")
+        product_choice = _draft_for(
+            post_id,
+            language,
+            text,
+            config,
+            placement_kind="prospect",
+            prospect_intent=prospect_intent,
+        )
         if product_choice is None:
             continue
         product_key, product_name, draft, fit_score, fit_reason = product_choice
         crowd_score = _score(post, user)
-        placement_score = round(crowd_score + fit_score * 15.0, 2)
+        placement_score = round(crowd_score + fit_score * 15.0 + intent_bonus, 2)
 
         rows.append({
-            "schema": "tanuki-scout-candidate/v0.4",
+            "schema": "tanuki-scout-candidate/v0.5",
             "observed_at": now.isoformat(),
             "target_post_id": post_id,
             "target_url": _post_url(username, post_id),
             "target_author_id": author_id,
             "target_username": username,
             "language": language,
-            "placement_kind": "topic",
+            "placement_kind": "prospect",
+            "prospect_intent": prospect_intent,
+            "intent_hits": intent_hits[:4],
+            "intent_bonus": intent_bonus,
             "lane": lane,
             "created_at": created.isoformat(),
             "age_hours": round(age_hours, 2),
@@ -451,7 +518,7 @@ def _collect_topic_candidates(
             "draft_product_key": product_key,
             "draft_product_name": product_name,
             "draft_reply": draft,
-            "send_status": "MANUAL_ONLY_TOPIC_PLACEMENT",
+            "send_status": "MANUAL_ONLY_PROSPECT_PLACEMENT",
         })
 
     rows.sort(key=lambda row: (-float(row["score"]), float(row["age_hours"])))
@@ -566,31 +633,31 @@ def main() -> int:
             )
         )
 
-    topic_rows: list[dict] = []
-    for spec in config.get("topic_searches") or []:
+    prospect_rows: list[dict] = []
+    for spec in config.get("prospect_searches") or []:
         if calls >= max_calls:
             break
         payload = _search_recent(bearer, str(spec["query"]))
         calls += 1
-        topic_rows.extend(
-            _collect_topic_candidates(
+        prospect_rows.extend(
+            _collect_prospect_candidates(
                 payload,
                 str(spec.get("language") or "en"),
-                str(spec.get("lane") or "topic"),
+                str(spec.get("lane") or "prospect"),
                 config,
                 known_candidates
                 | {row["target_post_id"] for row in candidate_rows}
-                | {row["target_post_id"] for row in topic_rows},
+                | {row["target_post_id"] for row in prospect_rows},
                 now,
             )
         )
 
-    topic_limit = int(limits.get("topic_candidate_rows_per_run") or candidate_limit)
-    topic_rows = sorted(
-        topic_rows,
+    prospect_limit = int(limits.get("prospect_candidate_rows_per_run") or candidate_limit)
+    prospect_rows = sorted(
+        prospect_rows,
         key=lambda row: (-float(row["score"]), float(row["age_hours"])),
-    )[:topic_limit]
-    candidate_rows.extend(topic_rows)
+    )[:prospect_limit]
+    candidate_rows.extend(prospect_rows)
 
     for spec in config.get("market_searches") or []:
         if calls >= max_calls:
@@ -609,6 +676,23 @@ def main() -> int:
 
     candidate_rows = _select_language_balanced_candidates(
         candidate_rows,
+        candidate_limit * 3,
+        {},
+    )
+    max_per_author = max(1, int(limits.get("candidate_rows_per_author") or 1))
+    author_counts: dict[str, int] = {}
+    diverse_rows: list[dict] = []
+    for row in candidate_rows:
+        author_id = str(row.get("target_author_id") or "")
+        if author_id:
+            seen = author_counts.get(author_id, 0)
+            if seen >= max_per_author:
+                continue
+            author_counts[author_id] = seen + 1
+        diverse_rows.append(row)
+
+    candidate_rows = _select_language_balanced_candidates(
+        diverse_rows,
         candidate_limit,
         limits.get("candidate_rows_per_language") or {},
     )
