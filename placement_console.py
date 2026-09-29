@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 
 ROOT = Path(os.environ.get("LOCALAPPDATA", ".")) / "TanukiXPublisher"
 STATE_DIR = Path(os.environ.get("TANUKI_SCOUT_STATE_DIR", ROOT / "placement-state"))
-CANDIDATES = STATE_DIR / "scout_candidates.jsonl"
+CANDIDATES = STATE_DIR / "scout_candidates_v03.jsonl"
 HANDLED = STATE_DIR / "manual_placements.jsonl"
 
 
@@ -46,6 +46,12 @@ def record_handled(row: dict, action: str) -> None:
     payload = {
         "target_post_id": row.get("target_post_id"),
         "target_url": row.get("target_url"),
+        "target_username": row.get("target_username"),
+        "target_text": row.get("target_text"),
+        "draft_product_key": row.get("draft_product_key"),
+        "draft_product_name": row.get("draft_product_name"),
+        "fit_score": row.get("fit_score"),
+        "fit_reason": row.get("fit_reason"),
         "action": action,
         "handled_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -152,8 +158,9 @@ class PlacementConsole:
         self.meta.set(
             f"@{row.get('target_username') or '?'}  |  "
             f"返信 {metrics.get('reply_count', 0)}  いいね {metrics.get('like_count', 0)}  "
-            f"RT {metrics.get('retweet_count', 0)}  |  score {row.get('score', 0)}  |  "
-            f"{row.get('age_hours', '?')}h前  |  推奨: {row.get('draft_product_name') or '-'}"
+            f"RT {metrics.get('retweet_count', 0)}  |  crowd {row.get('crowd_score', row.get('score', 0))}  |  "
+            f"fit {row.get('fit_score', '?')}  |  {row.get('age_hours', '?')}h前  |  "
+            f"推奨: {row.get('draft_product_name') or '-'}  |  理由: {row.get('fit_reason') or '-'}"
         )
         self.set_text(self.target, str(row.get("target_text") or ""))
         self.draft.delete("1.0", END)
