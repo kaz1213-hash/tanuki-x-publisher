@@ -18,7 +18,7 @@ CONFIG = {
     },
     "relevance": {
         "off_topic_any": ["歌コレ", "歌ってみた", "music cover"],
-        "generic_builder_any": ["ai", "saas", "builder", "project url", "app", "tool", "個人開発", "開発", "アプリ"],
+        "generic_builder_any": ["ai", "saas", "builder", "project", "project url", "app", "tool", "個人開発", "開発", "アプリ", "プロジェクト"],
         "product_affinity": {
             "project-vault": {
                 "terms": ["chatgpt", "ai", "saas", "builder", "app", "tool", "個人開発", "開発", "アプリ"],
