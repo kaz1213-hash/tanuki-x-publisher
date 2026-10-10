@@ -42,6 +42,7 @@ jobs:
         env:
           TANUKI_SOURCE_REPO: kaz1213-hash/tanuki-growth
           TANUKI_GROWTH_READ_TOKEN: ${{ secrets.TANUKI_GROWTH_READ_TOKEN }}
+          TANUKI_MEDIA_APPROVAL_HMAC_KEY: ${{ secrets.TANUKI_MEDIA_APPROVAL_HMAC_KEY }}
           X_API_KEY: ${{ secrets.X_API_KEY }}
           X_API_SECRET: ${{ secrets.X_API_SECRET }}
           X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
