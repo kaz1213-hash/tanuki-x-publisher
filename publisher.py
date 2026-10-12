@@ -11,6 +11,8 @@ from pathlib import Path
 import requests
 from requests_oauthlib import OAuth1
 
+import approval_verifier as AV
+
 GITHUB_API = "https://api.github.com"
 SOURCE_REPO = os.environ.get("TANUKI_SOURCE_REPO", "kaz1213-hash/tanuki-growth").strip()
 QUEUE_PATH = "tanuki-x/queue"
@@ -34,6 +36,8 @@ class QueueItem:
     product: str
     campaign: str
     has_media: bool
+    approval_data: dict | None = None
+    promoter: bool = False
 
 
 def _require_env(name: str) -> str:
@@ -121,6 +125,7 @@ def _load_private_queue() -> list[QueueItem]:
                 product=str(data.get("product") or ""),
                 campaign=str(data.get("campaign") or ""),
                 has_media=has_media,
+                approval_data=data,
             )
         )
     return items
@@ -166,6 +171,8 @@ def _load_promoter_sprint() -> list[QueueItem]:
                 product=str(row.get("product") or ""),
                 campaign=str(row.get("campaign") or ""),
                 has_media=False,
+                approval_data=row,
+                promoter=True,
             )
         )
 
@@ -332,6 +339,25 @@ def main() -> int:
     if len(queue_ids) != len(set(queue_ids)):
         raise ValueError("Duplicate queue item id across legacy queue and promoter sprint")
 
+    # Do not grant auto-publishing authority to an unsigned queue status.
+    # Legacy manually-reviewed items stay on their existing migration path;
+    # all generated stories and promoter rows require exact Director consent.
+    def approval_permits(item: QueueItem) -> bool:
+        if item.approval_data is None:
+            return not item.promoter  # only for older programmatic/manual callers
+        try:
+            AV.require_approved(item.approval_data, promoter=item.promoter)
+            if AV.needs_approval(item.approval_data, promoter=item.promoter):
+                if item.approval_data.get("text") != item.text:
+                    raise AV.Unapproved("approved text would be normalized")
+            return True
+        except AV.Unapproved as exc:
+            print(f"SKIP_AWAITING_DIRECTOR_APPROVAL: {item.item_id}: {exc}")
+            return False
+
+    legacy_queue = [item for item in legacy_queue if approval_permits(item)]
+    promoter_queue = [item for item in promoter_queue if approval_permits(item)]
+
     # During the bounded Promoter sprint, a due promoter item gets the slot first.
     # This prevents older legacy-ready items from starving the 8/day exposure cadence.
     due = _select_due_queue(promoter_queue, legacy_queue, published, now)
@@ -348,6 +374,12 @@ def main() -> int:
 
     for item in text_due[:MAX_POSTS_PER_RUN]:
         text, text_mode, weighted_length = _prepare_text(item)
+        if item.approval_data is not None and AV.needs_approval(item.approval_data, promoter=item.promoter):
+            if text_mode != "original":
+                print(f"SKIP_APPROVED_TEXT_TRANSFORMATION: {item.item_id}")
+                continue
+            # Recheck at the last possible point before the X API call.
+            AV.require_approved(item.approval_data, promoter=item.promoter)
         post_id, url = _publish_text(text)
         _append_receipt(item, post_id, url, text_mode, weighted_length)
         print(f"POSTED: {item.item_id} -> {url}")
