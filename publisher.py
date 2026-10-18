@@ -323,6 +323,12 @@ def _select_due_queue(
 
 
 def main() -> int:
+    # Director-approved X copy only. Old Promoter/legacy queue stays HOLD.
+    from media_lab_transport import run
+    return run()
+
+
+def _legacy_main_DISABLED() -> int:
     now = datetime.now(timezone.utc)
     published = _load_published_ids()
     legacy_queue = _load_private_queue()
