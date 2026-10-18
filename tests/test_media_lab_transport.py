@@ -59,7 +59,7 @@ class MediaLabTransportTests(unittest.TestCase):
         root = Path(td)
         public = root / "published.jsonl"
         public.write_text(json.dumps(receipt("2026-10-17T09:17:02Z")) + "\n", encoding="utf-8")
-        manifest = json.dumps({"schema": x.SCHEMA, "items": [item()]})
+        manifest = json.dumps({"schema": x.SCHEMA, "allow_prepaid_api_usage": True, "items": [item()]})
         p1 = patch.object(x, "PUBLIC_RECEIPTS", public)
         p2 = patch.object(x, "ATTEMPTS_DIR", root / "attempts")
         p3 = patch.object(x, "_github_read", side_effect=lambda path, allow_missing=False:
