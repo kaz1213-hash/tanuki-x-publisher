@@ -108,7 +108,7 @@ def _live_timeline(auth: OAuth1) -> list[dict]:
         raise RuntimeError("X_ACCOUNT_MISMATCH")
     timeline = _get_x(
         f"{API}/users/{me['id']}/tweets",
-        auth, {"max_results": 100, "tweet.fields": "created_at"},
+        auth, {"max_results": 10, "tweet.fields": "created_at"},
     )
     tweets = timeline.get("data")
     if not isinstance(tweets, list) or not tweets:
@@ -170,6 +170,10 @@ def run() -> int:
     doc = json.loads(raw)
     if not isinstance(doc, dict) or doc.get("schema") != SCHEMA:
         raise RuntimeError("APPROVAL_SCHEMA_INVALID")
+    # X API is metered. Never spend credits or trigger a top-up without an explicit, verified prepaid-use gate.
+    if doc.get("allow_prepaid_api_usage") is not True:
+        print("PAID_X_API_NOT_AUTHORIZED_HOLD")
+        return 0
     items = [_approved_item(x) for x in doc.get("items", [])]
     ids = [x["id"] for x in items]
     if len(set(ids)) != len(ids):
