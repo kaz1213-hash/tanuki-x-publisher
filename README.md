@@ -21,8 +21,11 @@ is HOLD; the historical parsing/test helpers are retained only for regression co
 - Published public receipt is committed by the pre-existing workflow step;
   the private Growth published ledger is read-only for this public transport and
   must be reconciled by the existing Media Lab owner after independent verification.
-- API write/read entitlements, provider billing, schedule execution, and actual
-  publication remain **unverified** until confirmed by the real provider.
+- **X official API is metered (prepaid credits).** With no private approval manifest or
+  without its explicit `allow_prepaid_api_usage: true`, the transport makes **zero X API calls**.
+  No purchase, top-up, or billing settings are changed by this code. A maximum of 10 owned
+  posts are read at each permitted preflight. Read/write entitlements, actual credit balance,
+  auto-recharge setting, workflow execution and real publication remain **unverified**.
   Unit tests do not authorize a publish on their own.
 
 ## Historical design (not active for new posts)
