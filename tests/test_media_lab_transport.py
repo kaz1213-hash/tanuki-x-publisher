@@ -66,7 +66,7 @@ class MediaLabTransportTests(unittest.TestCase):
             manifest if path == x.APPROVAL_PATH else private_receipts)
         p4 = patch.object(x, "_oauth", return_value=object())
         p5 = patch.object(x, "_live_timeline", side_effect=live)
-        p6 = patch.object(x, "datetime")
+        p6 = patch.object(x, "datetime", wraps=datetime)
         for p in [p1, p2, p3, p4, p5, p6]: p.start()
         x.datetime.now.return_value = now
         return [p1, p2, p3, p4, p5, p6], public
