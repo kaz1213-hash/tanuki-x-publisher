@@ -2,12 +2,12 @@
   "id": "TML-X-SHORT-20261017-PERMISSION-FORM-01",
   "approval_id": "DIRECTOR-20261017-PERMISSION-FORM-EN-01",
   "caption_sha256": "b4e5f21cbb3a220c20768eeaf0427bf40df7d9863d6b2f8625c16af3cc489203",
-  "state": "ATTEMPT_RESERVED_NO_AUTOMATIC_RETRY",
+  "state": "PUBLISHED_VERIFIED",
   "attempt_limit": 1,
-  "post_button_click_count": 0,
-  "published": false,
-  "public_url": null,
-  "post_id": null,
+  "post_button_click_count": 1,
+  "published": true,
+  "public_url": "https://x.com/TanukiBySCA/status/2113771720549319136",
+  "post_id": "2113771720549319136",
   "day_jst": "2026-10-24",
   "preflight": {
     "authenticated_x_profile_fresh_20261024": true,
@@ -31,5 +31,10 @@
   "allow_prepaid_api_usage": false,
   "no_post_if_authentication_fails": true,
   "no_post_if_composer_sha_fails": true,
-  "no_automatic_retries": true
+  "no_automatic_retries": true,
+  "published_at": "2026-10-23T23:17:04.815Z",
+  "verified_from": "X_AUTHENTICATED_OWNER_PERMALINK_SCREENSHOT_20261024",
+  "public_ledger_commit": "25b9abdda5f25a88a206ef1ad080e59f89b74a6f",
+  "private_ledger_commit": "69a9e103cda45fbaf5c70956f5d09977fdd4ff4e",
+  "publication_gate": "COMPLETED_VERIFIED_EXACT_ONCE_NO_REPOST"
 }
