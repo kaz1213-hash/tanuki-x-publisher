@@ -1,0 +1,35 @@
+{
+  "id": "TML-X-SHORT-20261017-PERMISSION-FORM-01",
+  "approval_id": "DIRECTOR-20261017-PERMISSION-FORM-EN-01",
+  "caption_sha256": "b4e5f21cbb3a220c20768eeaf0427bf40df7d9863d6b2f8625c16af3cc489203",
+  "state": "ATTEMPT_RESERVED_NO_AUTOMATIC_RETRY",
+  "attempt_limit": 1,
+  "post_button_click_count": 0,
+  "published": false,
+  "public_url": null,
+  "post_id": null,
+  "day_jst": "2026-10-24",
+  "preflight": {
+    "authenticated_x_profile_fresh_20261024": true,
+    "owner_profile_count_before": 97,
+    "target_absent_from_owner_recent_timeline": true,
+    "owner_no_today_post_visible": true,
+    "native_scheduled_oct24_count": 0,
+    "native_future_scheduled": [
+      "2026-10-26T10:30:00+09:00",
+      "2026-10-29T19:30:00+09:00"
+    ],
+    "both_published_ledger_target_duplicate_count": 0,
+    "both_published_ledger_today_count": 0,
+    "public_published_blob_sha": "ad1abe16fa40fc3132461bf37f83a11003ae1c97",
+    "private_published_blob_sha": "b6ff2114c9bf58fd1c97f4a6d47873bb931bfbc9",
+    "private_approved_queue_blob_sha": "ea4e462f42dc781e921d2a8315c5c56b53a966cd"
+  },
+  "transport": "X_OFFICIAL_AUTHENTICATED_CHROME_YOGA7",
+  "preapproved_text_only": true,
+  "media_count": 0,
+  "allow_prepaid_api_usage": false,
+  "no_post_if_authentication_fails": true,
+  "no_post_if_composer_sha_fails": true,
+  "no_automatic_retries": true
+}
